@@ -1,5 +1,7 @@
 export * from './types/index.js'
 export { AgentReasoningEngine } from './reasoning/engine.js'
 export { PermissionEnforcer } from './permissions/enforcer.js'
+export { VectorMemoryManager } from './memory/vectorManager.js'
 export { AgentMemoryManager } from './memory/manager.js'
 export { AgentLifecycle } from './lifecycle/manager.js'
+export { AgentService, agentService } from '../service.js'
