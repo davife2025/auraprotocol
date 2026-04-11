@@ -1,0 +1,32 @@
+{
+  "name": "@aura/contracts",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:testnet": "hardhat run scripts/deploy.ts --network monadTestnet",
+    "deploy:mainnet": "hardhat run scripts/deploy.ts --network monadMainnet",
+    "verify": "hardhat verify --network monadTestnet",
+    "clean": "hardhat clean && rm -rf artifacts typechain-types cache"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0"
+  },
+  "devDependencies": {
+    "@aura/config": "workspace:*",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@typechain/hardhat": "^9.1.0",
+    "@typechain/ethers-v6": "^0.5.0",
+    "hardhat": "^2.22.0",
+    "typechain": "^8.3.0",
+    "ethers": "^6.13.0",
+    "dotenv": "^16.4.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.0",
+    "chai": "^4.4.0",
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^10.0.0"
+  }
+}

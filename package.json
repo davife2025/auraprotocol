@@ -1,0 +1,31 @@
+{
+  "name": "aura-protocol",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Aura Protocol — sovereign AI agent platform on Monad",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "type-check": "turbo run type-check",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\"",
+    "contracts:compile": "pnpm --filter @aura/contracts compile",
+    "contracts:deploy:testnet": "pnpm --filter @aura/contracts deploy:testnet",
+    "contracts:deploy:mainnet": "pnpm --filter @aura/contracts deploy:mainnet",
+    "db:generate": "pnpm --filter @aura/db generate",
+    "db:migrate": "pnpm --filter @aura/db migrate:dev",
+    "db:studio": "pnpm --filter @aura/db studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.5.0"
+  }
+}
