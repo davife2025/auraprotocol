@@ -1,4 +1,8 @@
 export * from './types/index.js'
 export { IdentityClient } from './client/IdentityClient.js'
+export { TokenClient } from './client/TokenClient.js'
+export { MeetingClient } from './client/MeetingClient.js'
 export { AURA_IDENTITY_ABI } from './abis/AuraIdentity.js'
 export { AURA_REPUTATION_ABI } from './abis/AuraReputation.js'
+export { AURA_TOKEN_ABI } from './abis/AuraToken.js'
+export { AURA_MEETING_FACTORY_ABI } from './abis/AuraMeetingFactory.js'

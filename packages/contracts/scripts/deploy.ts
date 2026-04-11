@@ -3,77 +3,97 @@ import { writeFileSync } from 'fs'
 import { join } from 'path'
 
 async function main() {
-  const [deployer] = await ethers.getSigners()
-  console.log('Deploying Aura Protocol contracts...')
-  console.log('Deployer:', deployer.address)
-  console.log('Balance:', ethers.formatEther(await deployer.provider.getBalance(deployer.address)), 'MON')
+  const signers = await ethers.getSigners()
+  const deployer = signers[0]
 
-  // 1. Deploy AuraIdentity
-  console.log('\n1. Deploying AuraIdentity...')
-  const AuraIdentity = await ethers.getContractFactory('AuraIdentity')
-  const identity = await AuraIdentity.deploy()
+  console.log('Deploying Aura Protocol contracts to Monad...')
+  console.log('Deployer:', deployer.address)
+  console.log('Balance:', ethers.formatEther(await deployer.provider.getBalance(deployer.address)), 'MON\n')
+
+  // Use deployer for all allocation wallets in testnet; replace in mainnet
+  const communityAddr = signers[1]?.address ?? deployer.address
+  const founderAddr   = signers[2]?.address ?? deployer.address
+  const investorAddr  = signers[3]?.address ?? deployer.address
+  const ecosystemAddr = signers[4]?.address ?? deployer.address
+  const treasuryAddr  = signers[5]?.address ?? deployer.address
+
+  // 1. AuraIdentity
+  console.log('1. Deploying AuraIdentity...')
+  const identity = await (await ethers.getContractFactory('AuraIdentity')).deploy()
   await identity.waitForDeployment()
   const identityAddress = await identity.getAddress()
-  console.log('   AuraIdentity deployed to:', identityAddress)
+  console.log('   ✓', identityAddress)
 
-  // 2. Deploy AuraRegistry
-  console.log('\n2. Deploying AuraRegistry...')
-  const AuraRegistry = await ethers.getContractFactory('AuraRegistry')
-  const registry = await AuraRegistry.deploy(identityAddress)
+  // 2. AuraRegistry
+  console.log('2. Deploying AuraRegistry...')
+  const registry = await (await ethers.getContractFactory('AuraRegistry')).deploy(identityAddress)
   await registry.waitForDeployment()
   const registryAddress = await registry.getAddress()
-  console.log('   AuraRegistry deployed to:', registryAddress)
+  console.log('   ✓', registryAddress)
 
-  // 3. Deploy AuraReputation
-  console.log('\n3. Deploying AuraReputation...')
-  const AuraReputation = await ethers.getContractFactory('AuraReputation')
-  const reputation = await AuraReputation.deploy()
+  // 3. AuraReputation
+  console.log('3. Deploying AuraReputation...')
+  const reputation = await (await ethers.getContractFactory('AuraReputation')).deploy()
   await reputation.waitForDeployment()
   const reputationAddress = await reputation.getAddress()
-  console.log('   AuraReputation deployed to:', reputationAddress)
+  console.log('   ✓', reputationAddress)
 
-  // 4. Deploy AuraPermissions
-  console.log('\n4. Deploying AuraPermissions...')
-  const AuraPermissions = await ethers.getContractFactory('AuraPermissions')
-  const permissions = await AuraPermissions.deploy()
+  // 4. AuraPermissions
+  console.log('4. Deploying AuraPermissions...')
+  const permissions = await (await ethers.getContractFactory('AuraPermissions')).deploy()
   await permissions.waitForDeployment()
   const permissionsAddress = await permissions.getAddress()
-  console.log('   AuraPermissions deployed to:', permissionsAddress)
+  console.log('   ✓', permissionsAddress)
 
-  // 5. Authorise deployer as minter/writer (replace with API wallet in production)
-  console.log('\n5. Setting up authorisations...')
+  // 5. MeetingFactory
+  console.log('5. Deploying MeetingFactory...')
+  const factory = await (await ethers.getContractFactory('MeetingFactory')).deploy(reputationAddress, deployer.address)
+  await factory.waitForDeployment()
+  const factoryAddress = await factory.getAddress()
+  console.log('   ✓', factoryAddress)
+
+  // 6. AuraToken
+  console.log('6. Deploying AuraToken ($AURA)...')
+  const token = await (await ethers.getContractFactory('AuraToken')).deploy(
+    communityAddr, founderAddr, investorAddr, ecosystemAddr, treasuryAddr
+  )
+  await token.waitForDeployment()
+  const tokenAddress = await token.getAddress()
+  console.log('   ✓', tokenAddress)
+
+  // 7. Wire authorisations
+  console.log('\n7. Setting up authorisations...')
   await identity.authoriseMinter(deployer.address)
+  await identity.authoriseMinter(factoryAddress)
   await reputation.authoriseWriter(deployer.address)
+  await reputation.authoriseWriter(factoryAddress)
   await permissions.authoriseWriter(deployer.address)
-  console.log('   Authorisations set')
+  console.log('   ✓ Done')
 
-  // 6. Write addresses to deployment file
-  const deployedAddresses = {
+  // 8. Save
+  const out = {
     network: (await ethers.provider.getNetwork()).name,
     chainId: Number((await ethers.provider.getNetwork()).chainId),
     deployedAt: new Date().toISOString(),
     deployer: deployer.address,
     contracts: {
-      AuraIdentity: identityAddress,
-      AuraRegistry: registryAddress,
-      AuraReputation: reputationAddress,
+      AuraIdentity:    identityAddress,
+      AuraRegistry:    registryAddress,
+      AuraReputation:  reputationAddress,
       AuraPermissions: permissionsAddress,
+      MeetingFactory:  factoryAddress,
+      AuraToken:       tokenAddress,
     },
   }
-
-  const outPath = join(__dirname, '..', 'deployments.json')
-  writeFileSync(outPath, JSON.stringify(deployedAddresses, null, 2))
-  console.log('\nDeployment addresses saved to deployments.json')
+  writeFileSync(join(__dirname, '..', 'deployments.json'), JSON.stringify(out, null, 2))
 
   console.log('\n=== DEPLOYMENT COMPLETE ===')
-  console.log('Add these to your .env:')
   console.log(`AURA_IDENTITY_CONTRACT=${identityAddress}`)
   console.log(`AURA_REGISTRY_CONTRACT=${registryAddress}`)
   console.log(`AURA_REPUTATION_CONTRACT=${reputationAddress}`)
   console.log(`AURA_PERMISSIONS_CONTRACT=${permissionsAddress}`)
+  console.log(`AURA_MEETING_FACTORY_CONTRACT=${factoryAddress}`)
+  console.log(`AURA_TOKEN_CONTRACT=${tokenAddress}`)
 }
 
-main().catch(err => {
-  console.error(err)
-  process.exit(1)
-})
+main().catch(err => { console.error(err); process.exit(1) })

@@ -36,5 +36,13 @@ export interface ContractAddresses {
   permissions: `0x${string}`
   registry: `0x${string}`
   reputation: `0x${string}`
+  meetingFactory?: `0x${string}`
   token?: `0x${string}`
+}
+
+export interface TokenBalance {
+  wallet: `0x${string}`
+  balance: bigint
+  stakedBalance: bigint
+  tier: 'free' | 'pro' | 'business'
 }

@@ -63,8 +63,29 @@ export async function meetingRoutes(server: FastifyInstance) {
     preHandler: [server.authenticate],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    // TODO: session 5 — hash outcomes, write to Monad
-    return reply.status(200).send({ id, settled: true, txHash: null })
+    const body = request.body as {
+      transcriptEntries?: Array<{ agentId: string; message: string; timestamp: string }>
+      commitments?: string[]
+      participantWallets?: string[]
+      participantScores?: number[]
+    }
+    const { isOnchainConfigured, getMeetingClient } = await import('../services/onchain.js')
+    if (!isOnchainConfigured()) {
+      return reply.status(200).send({ id, settled: false, txHash: null, onchain: false })
+    }
+    try {
+      const txHash = await getMeetingClient().settleMeeting({
+        meetingId: id,
+        transcriptEntries: body.transcriptEntries ?? [],
+        commitments: body.commitments ?? [],
+        participantWallets: (body.participantWallets ?? []) as `0x${string}`[],
+        participantScores: body.participantScores ?? [],
+      })
+      return reply.status(200).send({ id, settled: true, txHash, onchain: true })
+    } catch (err: any) {
+      server.log.error({ err }, 'Meeting settlement failed')
+      return reply.status(500).send({ error: 'Settlement failed', message: err.message })
+    }
   })
 
   // WebSocket — live meeting stream

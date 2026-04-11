@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+  }
+
+  * {
+    @apply border-gray-200 dark:border-gray-800;
+  }
+
+  body {
+    @apply bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-50;
+  }
+}
+
+@layer components {
+  .aura-card {
+    @apply bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5;
+  }
+
+  .aura-badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .aura-badge-active {
+    @apply aura-badge bg-teal-50 text-teal-800 dark:bg-teal-900 dark:text-teal-100;
+  }
+
+  .aura-badge-pending {
+    @apply aura-badge bg-amber-50 text-amber-800 dark:bg-amber-900 dark:text-amber-100;
+  }
+}
