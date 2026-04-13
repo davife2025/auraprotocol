@@ -45,7 +45,7 @@ export async function isFreighterInstalled(): Promise<boolean> {
   if (typeof window === 'undefined') return false
   try {
     if (!window.freighter) return false
-    const { isConnected } = await window.freighter.isConnected()
+    //const { isConnected } = await window.freighter.isConnected()
     return true
   } catch {
     return false

@@ -83,7 +83,7 @@ export class IdentityClient {
         abi: AURA_REPUTATION_ABI,
         functionName: 'getReputation',
         args: [walletAddress],
-      }) as any[]
+     }) as unknown as any[]
 
       return {
         walletAddress,
