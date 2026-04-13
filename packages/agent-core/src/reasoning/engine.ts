@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import type {
   AgentProfile,
   AgentDecisionContext,
@@ -6,9 +6,12 @@ import type {
   AgentMemoryEntry,
 } from '../types/index.js'
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+const client = new OpenAI({
+  baseURL: 'https://router.huggingface.co/novita/v3/openai',
+  apiKey: process.env.HUGGINGFACE_API_KEY,
 })
+
+const MODEL = 'moonshotai/Kimi-K2-Instruct'
 
 const AGENT_SYSTEM_PROMPT = (profile: AgentProfile, memories: AgentMemoryEntry[]) => `
 You are an AI agent representing ${profile.name}. You act on their behalf with full authority within your permission boundaries.
@@ -26,7 +29,7 @@ ${profile.personalityProfile.customInstructions ? `- Special instructions: ${pro
 - ALWAYS escalate to human if: ${profile.permissions.meetings.escalateIf.join(', ')}
 
 ## Relevant Memory
-${memories.map(m => `- [${m.type}] ${m.content}`).join('\n')}
+${memories.map((m: AgentMemoryEntry) => `- [${m.type}] ${m.content}`).join('\n')}
 
 ## Core Rules
 1. Always act as if you ARE your owner — speak in first person as them
@@ -46,19 +49,18 @@ export class AgentReasoningEngine {
     conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
     memories: AgentMemoryEntry[] = []
   ): Promise<string> {
-    const response = await client.messages.create({
-      model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-20250514',
+    const response = await client.chat.completions.create({
+      model: MODEL,
       max_tokens: 1024,
-      system: AGENT_SYSTEM_PROMPT(this.profile, memories),
-      messages: conversationHistory,
+      messages: [
+        { role: 'system', content: AGENT_SYSTEM_PROMPT(this.profile, memories) },
+        ...conversationHistory,
+      ],
     })
 
-    const textBlock = response.content.find(b => b.type === 'text')
-    if (!textBlock || textBlock.type !== 'text') {
-      throw new Error('No text response from LLM')
-    }
-
-    return textBlock.text
+    const result = response.choices[0]?.message?.content ?? ''
+    if (!result) throw new Error('No text response from LLM')
+    return result
   }
 
   /**
@@ -85,19 +87,19 @@ ${context.timeConstraint ? `Time constraint: ${context.timeConstraint}` : ''}
 ${context.counterparty ? `Counterparty reputation: ${context.counterparty.reputationScore}/100` : ''}
 `.trim()
 
-    const response = await client.messages.create({
-      model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-20250514',
+    const response = await client.chat.completions.create({
+      model: MODEL,
       max_tokens: 512,
-      system: AGENT_SYSTEM_PROMPT(this.profile, memories),
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        { role: 'system', content: AGENT_SYSTEM_PROMPT(this.profile, memories) },
+        { role: 'user',   content: prompt },
+      ],
     })
 
-    const textBlock = response.content.find(b => b.type === 'text')
-    if (!textBlock || textBlock.type !== 'text') {
-      throw new Error('No text response from LLM')
-    }
+    const result = response.choices[0]?.message?.content ?? ''
+    if (!result) throw new Error('No text response from LLM')
 
-    return JSON.parse(textBlock.text) as AgentDecision
+    return JSON.parse(result.replace(/```json|```/g, '').trim()) as AgentDecision
   }
 
   /**
@@ -108,7 +110,7 @@ ${context.counterparty ? `Counterparty reputation: ${context.counterparty.reputa
     commitments: string[]
   ): Promise<string> {
     const transcriptText = transcript
-      .map(t => `[${t.timestamp}] ${t.agentId}: ${t.message}`)
+      .map((t: { agentId: string; message: string; timestamp: string }) => `[${t.timestamp}] ${t.agentId}: ${t.message}`)
       .join('\n')
 
     const prompt = `
@@ -124,18 +126,17 @@ Transcript:
 ${transcriptText}
 `.trim()
 
-    const response = await client.messages.create({
-      model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-20250514',
+    const response = await client.chat.completions.create({
+      model: MODEL,
       max_tokens: 1024,
-      system: AGENT_SYSTEM_PROMPT(this.profile, []),
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        { role: 'system', content: AGENT_SYSTEM_PROMPT(this.profile, []) },
+        { role: 'user',   content: prompt },
+      ],
     })
 
-    const textBlock = response.content.find(b => b.type === 'text')
-    if (!textBlock || textBlock.type !== 'text') {
-      throw new Error('No text response from LLM')
-    }
-
-    return textBlock.text
+    const result = response.choices[0]?.message?.content ?? ''
+    if (!result) throw new Error('No text response from LLM')
+    return result
   }
 }
