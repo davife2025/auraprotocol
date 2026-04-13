@@ -19,9 +19,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.27.0",
-    "zod": "^3.23.0",
-    "viem": "^2.17.0"
+    "openai": "^6.34.0",
+    "viem": "^2.17.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@aura/config": "workspace:*",
