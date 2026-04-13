@@ -1,7 +1,7 @@
 import * as StellarSdk from '@stellar/stellar-sdk'
 import type { StellarConfig, OnchainIdentity, OnchainReputation } from '../types/index.js'
 
-const { SorobanRpc, Contract, TransactionBuilder, Networks, BASE_FEE, xdr, nativeToScVal, scValToNative, Keypair } = StellarSdk
+const { SorobanRpc, Contract, TransactionBuilder, BASE_FEE, nativeToScVal, scValToNative, Keypair } = StellarSdk
 
 export class StellarIdentityClient {
   private server: InstanceType<typeof SorobanRpc.Server>
@@ -58,7 +58,7 @@ export class StellarIdentityClient {
     const hash = result.hash
     let confirmation = await this.server.getTransaction(hash)
     let attempts = 0
-    while (confirmation.status === SorobanRpc.GetTransactionStatus.NOT_FOUND && attempts < 30) {
+    while (confirmation.status === SorobanRpc.Api.GetTransactionStatus.NOT_FOUND && attempts < 30) {
       await new Promise(r => setTimeout(r, 2000))
       confirmation = await this.server.getTransaction(hash)
       attempts++
