@@ -80,7 +80,7 @@ export default function OnboardingPage() {
       <div className="w-full max-w-lg">
         {/* Progress */}
         <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1">
-          {STEPS.map((s, i) => (
+          {STEPS.map((_s, i) => (
             <div key={i} className="flex items-center gap-2 shrink-0">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors
                 ${i < step ? 'bg-teal-500 text-white' : i === step ? 'bg-aura-600 text-white' : 'bg-gray-200 dark:bg-gray-800 text-gray-400'}`}>
