@@ -4,9 +4,9 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   transpilePackages: ['@aura/ui', '@aura/agent-core', '@aura/agent-identity'],
-  experimental: {
-    serverComponentsExternalPackages: ['@prisma/client'],
-  },
+ experimental: {
+  serverComponentsExternalPackages: ['@prisma/client', 'prisma'],
+},
   images: {
     domains: ['avatars.githubusercontent.com', 'lh3.googleusercontent.com'],
   },
