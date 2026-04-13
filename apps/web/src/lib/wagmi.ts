@@ -2,6 +2,7 @@ import { createConfig, http } from 'wagmi'
 import { defineChain } from 'viem'
 import { injected, metaMask } from 'wagmi/connectors'
 
+
 // Monad Testnet
 export const monadTestnet = defineChain({
   id: 10143,
@@ -29,10 +30,14 @@ export const monadMainnet = defineChain({
   },
 })
 
-export const wagmiConfig = createConfig({
+import type { Config } from 'wagmi'
+
+export const wagmiConfig: Config = createConfig({
   chains: [monadTestnet],
   connectors: [injected(), metaMask()],
   transports: {
     [monadTestnet.id]: http(process.env.NEXT_PUBLIC_MONAD_RPC ?? 'https://testnet-rpc.monad.xyz'),
   },
 })
+
+

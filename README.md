@@ -243,11 +243,11 @@ const reputation = await client.getReputation(walletAddress)
 |---|-------|--------|
 | 1 | Monorepo, tooling, scaffolding | ✅ Complete |
 | 2 | Monad smart contracts | 🔄 In progress |
-| 3 | Agent core engine + vector memory | |
-| 4 | ACP protocol + API server |  |
-| 5 | Meeting rooms (full feature) |  |
-| 6 | Aura Rooms + agent chat |  |
-| 7 | Web + mobile UI |  |
+| 3 | Agent core engine + vector memory | 🔜 |
+| 4 | ACP protocol + API server | 🔜 |
+| 5 | Meeting rooms (full feature) | 🔜 |
+| 6 | Aura Rooms + agent chat | 🔜 |
+| 7 | Web + mobile UI | 🔜 |
 | 8 | $AURA token + mainnet launch | 🔜 |
 
 ---

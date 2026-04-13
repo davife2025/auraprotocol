@@ -1,93 +1,95 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import { roomService } from '../services/roomService.js'
 
 const CreateRoomSchema = z.object({
   name: z.string().min(1).max(80),
   niche: z.string(),
-  description: z.string().max(500),
+  description: z.string().max(500).optional(),
   isPremium: z.boolean().default(false),
-  stakeRequired: z.string().optional(), // MON amount in wei
+  stakeRequired: z.string().optional(),
 })
 
-const ResonanceSignalSchema = z.object({
-  targetAgentId: z.string(),
+const ResonanceSchema = z.object({
+  fromAgentId: z.string(),
+  toAgentId: z.string(),
   roomId: z.string(),
 })
 
+const ChatSchema = z.object({
+  connectionId: z.string(),
+  fromAgentId: z.string(),
+  message: z.string().min(1).max(2000),
+})
+
 export async function roomRoutes(server: FastifyInstance) {
-  // GET /rooms — list all rooms
   server.get('/', async (request) => {
     const { niche, search } = request.query as { niche?: string; search?: string }
-    // TODO: session 6
-    return {
-      rooms: [
-        { id: '1', name: 'Web3 Founders', niche: 'web3', memberCount: 0 },
-        { id: '2', name: 'AI Builders', niche: 'ai', memberCount: 0 },
-        { id: '3', name: 'Lagos Creatives', niche: 'creative', memberCount: 0 },
-      ],
-      niche,
-      search,
-    }
+    return roomService.getRooms(niche, search)
   })
 
-  // POST /rooms — create a new niche room
-  server.post('/', {
-    preHandler: [server.authenticate],
-  }, async (request, reply) => {
+  server.post('/', { preHandler: [server.authenticate] }, async (request, reply) => {
+    const { userId } = request.user as { userId: string }
     const body = CreateRoomSchema.parse(request.body)
-    // TODO: session 6 — stake MON if premium, register onchain
-    return reply.status(201).send({ message: 'Room created', body })
+    const room = await roomService.createRoom(userId, body)
+    return reply.status(201).send(room)
   })
 
-  // POST /rooms/:id/join — agent joins a room
-  server.post('/:id/join', {
-    preHandler: [server.authenticate],
-  }, async (request) => {
+  server.post('/:id/join', { preHandler: [server.authenticate] }, async (request) => {
+    const { userId } = request.user as { userId: string }
     const { id } = request.params as { id: string }
-    const userId = (request.user as any).userId
-    // TODO: session 6 — verify agent exists, check stake if premium room
-    return { roomId: id, userId, joined: true }
+    const { agentId } = request.body as { agentId: string }
+    return roomService.joinRoom(id, userId, agentId)
   })
 
-  // GET /rooms/:id/agents — list agents currently in a room
+  server.post('/:id/leave', { preHandler: [server.authenticate] }, async (request) => {
+    const { id } = request.params as { id: string }
+    const { agentId } = request.body as { agentId: string }
+    await roomService.leaveRoom(id, agentId)
+    return { roomId: id, agentId, left: true }
+  })
+
   server.get('/:id/agents', async (request) => {
     const { id } = request.params as { id: string }
-    // TODO: session 6
-    return { roomId: id, agents: [] }
+    return roomService.getAgentsInRoom(id)
   })
 
-  // POST /rooms/resonate — send resonance signal to another agent
-  server.post('/resonate', {
-    preHandler: [server.authenticate],
-  }, async (request, reply) => {
-    const { targetAgentId, roomId } = ResonanceSignalSchema.parse(request.body)
-    // TODO: session 6 — calculate alignment score, check mutual resonance
-    return reply.status(200).send({
-      targetAgentId,
-      roomId,
-      alignmentScore: null,
-      mutualMatch: false,
-    })
+  server.post('/resonate', { preHandler: [server.authenticate] }, async (request) => {
+    const { fromAgentId, toAgentId, roomId } = ResonanceSchema.parse(request.body)
+    return roomService.computeResonance(fromAgentId, toAgentId, roomId)
   })
 
-  // GET /rooms/connections — list all agent connections for user
-  server.get('/connections', {
-    preHandler: [server.authenticate],
-  }, async (request) => {
-    const userId = (request.user as any).userId
-    // TODO: session 6
-    return { connections: [], userId }
+  server.get('/connections', { preHandler: [server.authenticate] }, async (request) => {
+    const { userId } = request.user as { userId: string }
+    return roomService.getConnectionsForUser(userId)
   })
 
-  // WebSocket — live room presence feed
+  server.post('/chat', { preHandler: [server.authenticate] }, async (request, reply) => {
+    const { connectionId, fromAgentId, message } = ChatSchema.parse(request.body)
+    const entry = await roomService.sendAgentChatMessage(connectionId, fromAgentId, message)
+    return reply.status(201).send(entry)
+  })
+
+  server.get('/connections/:connectionId/chat', { preHandler: [server.authenticate] }, async (request) => {
+    const { connectionId } = request.params as { connectionId: string }
+    return roomService.getChatHistory(connectionId)
+  })
+
+  // WebSocket — live room presence
   server.get('/:id/presence', { websocket: true }, (socket, request) => {
     const { id } = request.params as { id: string }
     socket.send(JSON.stringify({ type: 'room_connected', roomId: id }))
 
-    socket.on('message', (message: Buffer) => {
-      const data = JSON.parse(message.toString())
-      // TODO: session 6 — broadcast agent presence, resonance signals
-      socket.send(JSON.stringify({ type: 'ack', ...data }))
+    socket.on('message', (rawMsg: Buffer) => {
+      try {
+        const msg = JSON.parse(rawMsg.toString())
+        if (msg.type === 'presence_ping') {
+          socket.send(JSON.stringify({ type: 'presence_pong', roomId: id, timestamp: Date.now() }))
+        }
+        if (msg.type === 'resonance_signal') {
+          socket.send(JSON.stringify({ type: 'resonance_received', ...msg }))
+        }
+      } catch { /* ignore malformed */ }
     })
   })
 }

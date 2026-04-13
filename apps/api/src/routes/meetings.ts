@@ -1,106 +1,102 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import { meetingService } from '../services/meetingService.js'
+import { agentService } from '@aura/agent-core'
 
 const CreateMeetingSchema = z.object({
   title: z.string().min(1).max(100),
-  agenda: z.string().max(1000),
-  mode: z.enum(['full_agent', 'hybrid', 'observer']),
+  agenda: z.string().max(2000).optional(),
+  mode: z.enum(['FULL_AGENT', 'HYBRID', 'OBSERVER']),
   scheduledAt: z.string().datetime(),
-  invitees: z.array(z.object({
-    auraId: z.string(),
-    role: z.enum(['participant', 'observer']),
-  })),
+  invitees: z.array(z.object({ auraId: z.string(), role: z.string() })),
   rules: z.object({
-    agentsCanAttendSolo: z.boolean().default(true),
     agentsCanMakeBindingCommitments: z.boolean().default(false),
     recordOnchain: z.boolean().default(true),
-    quorum: z.number().min(1).optional(),
   }),
 })
 
 export async function meetingRoutes(server: FastifyInstance) {
-  // GET /meetings — list all meetings for user
-  server.get('/', {
-    preHandler: [server.authenticate],
-  }, async (request) => {
-    const userId = (request.user as any).userId
-    // TODO: session 5
-    return { meetings: [], userId }
+  server.get('/', { preHandler: [server.authenticate] }, async (request) => {
+    const { userId } = request.user as { userId: string }
+    const meetings = await server.prisma.meeting.findMany({
+      where: { participants: { some: { agent: { userId } } } },
+      include: {
+        _count: { select: { participants: true, commitments: true, transcriptEntries: true } },
+      },
+      orderBy: { scheduledAt: 'desc' },
+    })
+    return { meetings }
   })
 
-  // POST /meetings — create meeting room (deploys smart contract instance)
-  server.post('/', {
-    preHandler: [server.authenticate],
-  }, async (request, reply) => {
+  server.post('/', { preHandler: [server.authenticate] }, async (request, reply) => {
+    const { userId } = request.user as { userId: string }
     const body = CreateMeetingSchema.parse(request.body)
-    // TODO: session 5 — deploy MeetingRoom contract on Monad, invite agents
-    return reply.status(201).send({
-      message: 'Meeting room deploying on Monad',
-      contractAddress: null, // filled after deployment
-      body,
+    const meeting = await meetingService.createMeeting(userId, body)
+    return reply.status(201).send({ meeting })
+  })
+
+  server.get('/:id', { preHandler: [server.authenticate] }, async (request) => {
+    const { id } = request.params as { id: string }
+    return server.prisma.meeting.findUniqueOrThrow({
+      where: { id },
+      include: {
+        participants: { include: { agent: { select: { id: true, name: true, reputationScore: true } } } },
+        commitments: true,
+        transcriptEntries: { orderBy: { turnNumber: 'asc' }, take: 20 },
+      },
     })
   })
 
-  // GET /meetings/:id — get meeting details + live transcript
-  server.get('/:id', {
-    preHandler: [server.authenticate],
-  }, async (request) => {
+  server.post('/:id/start', { preHandler: [server.authenticate] }, async (request) => {
     const { id } = request.params as { id: string }
-    // TODO: session 5
-    return { id, status: 'not_implemented_yet' }
+    return meetingService.startMeeting(id)
   })
 
-  // GET /meetings/:id/transcript — get live or recorded transcript
-  server.get('/:id/transcript', {
-    preHandler: [server.authenticate],
-  }, async (request) => {
+  server.post('/:id/settle', { preHandler: [server.authenticate] }, async (request) => {
     const { id } = request.params as { id: string }
-    return { id, transcript: [] }
+    return meetingService.settleMeeting(id)
   })
 
-  // POST /meetings/:id/settle — settle meeting outcome onchain
-  server.post('/:id/settle', {
-    preHandler: [server.authenticate],
-  }, async (request, reply) => {
+  server.get('/:id/transcript', { preHandler: [server.authenticate] }, async (request) => {
     const { id } = request.params as { id: string }
-    const body = request.body as {
-      transcriptEntries?: Array<{ agentId: string; message: string; timestamp: string }>
-      commitments?: string[]
-      participantWallets?: string[]
-      participantScores?: number[]
-    }
-    const { isOnchainConfigured, getMeetingClient } = await import('../services/onchain.js')
-    if (!isOnchainConfigured()) {
-      return reply.status(200).send({ id, settled: false, txHash: null, onchain: false })
-    }
-    try {
-      const txHash = await getMeetingClient().settleMeeting({
-        meetingId: id,
-        transcriptEntries: body.transcriptEntries ?? [],
-        commitments: body.commitments ?? [],
-        participantWallets: (body.participantWallets ?? []) as `0x${string}`[],
-        participantScores: body.participantScores ?? [],
-      })
-      return reply.status(200).send({ id, settled: true, txHash, onchain: true })
-    } catch (err: any) {
-      server.log.error({ err }, 'Meeting settlement failed')
-      return reply.status(500).send({ error: 'Settlement failed', message: err.message })
-    }
+    const entries = await meetingService.getTranscript(id)
+    return { meetingId: id, entries }
+  })
+
+  server.post('/:id/commitments', { preHandler: [server.authenticate] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const { agentId, commitment, commitmentType } = request.body as any
+    const entry = await meetingService.logCommitment(id, agentId, commitment, commitmentType)
+    return reply.status(201).send(entry)
   })
 
   // WebSocket — live meeting stream
   server.get('/:id/stream', { websocket: true }, (socket, request) => {
     const { id } = request.params as { id: string }
-    socket.send(JSON.stringify({ type: 'connected', meetingId: id }))
+    socket.send(JSON.stringify({ type: 'connected', meetingId: id, timestamp: new Date().toISOString() }))
 
-    socket.on('message', (message: Buffer) => {
-      // TODO: session 5 — relay agent messages, broadcast to all participants
-      const data = JSON.parse(message.toString())
-      socket.send(JSON.stringify({ type: 'ack', ...data }))
+    socket.on('message', async (rawMsg: Buffer) => {
+      try {
+        const msg = JSON.parse(rawMsg.toString())
+
+        if (msg.type === 'agent_turn') {
+          // Record transcript entry
+          await meetingService.addTranscriptEntry(id, msg.agentId, msg.message, msg.turnNumber)
+          // Broadcast to all connected clients
+          socket.send(JSON.stringify({ type: 'transcript_entry', ...msg }))
+        }
+
+        if (msg.type === 'commitment') {
+          await meetingService.logCommitment(id, msg.agentId, msg.commitment, msg.commitmentType ?? 'general')
+          socket.send(JSON.stringify({ type: 'commitment_logged', commitment: msg.commitment }))
+        }
+      } catch (err) {
+        socket.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }))
+      }
     })
 
     socket.on('close', () => {
-      server.log.info(`Meeting stream closed: ${id}`)
+      server.log.info({ meetingId: id }, 'Meeting stream disconnected')
     })
   })
 }

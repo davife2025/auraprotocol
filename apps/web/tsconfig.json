@@ -11,6 +11,11 @@
   ],
   "compilerOptions": {
     "noEmit": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "ignoreDeprecations": "5.0",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   }
 }
