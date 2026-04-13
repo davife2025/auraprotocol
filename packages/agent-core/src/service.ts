@@ -1,13 +1,13 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { VectorMemoryManager } from '../memory/vectorManager.js'
-import { PermissionEnforcer } from '../permissions/enforcer.js'
+import { VectorMemoryManager } from '../src/memory/vectorManager'
+import { PermissionEnforcer } from '../src/permissions/enforcer'
 import type {
   AgentProfile,
   AgentDecisionContext,
   AgentDecision,
   AgentInstance,
   AgentStatus,
-} from '../types/index.js'
+} from '../src/types'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 

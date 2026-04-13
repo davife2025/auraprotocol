@@ -10,7 +10,8 @@
     "node_modules"
   ],
   "compilerOptions": {
-    "baseUrl": ".",        
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "noEmit": true,
     "isolatedModules": true
   }
