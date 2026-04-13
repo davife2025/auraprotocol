@@ -6,7 +6,7 @@ import { useAccount, useSignMessage } from 'wagmi'
 
 const STEPS = ['Connect wallet', 'Name your agent', 'Set personality', 'Set permissions', 'Mint identity']
 
-export default function OnboardingPage() {
+export default function OnboardingPage(): JSX.Element {
   const router = useRouter()
   const { address, isConnected } = useAccount()
   const { signMessageAsync } = useSignMessage()
@@ -234,3 +234,4 @@ export default function OnboardingPage() {
     </div>
   )
 }
+

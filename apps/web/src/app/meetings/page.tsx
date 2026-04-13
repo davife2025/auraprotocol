@@ -13,7 +13,7 @@ interface Meeting {
   _count: { participants: number; commitments: number }
 }
 
-export default function MeetingsPage() {
+export default function MeetingsPage(): JSX.Element {
   const router = useRouter()
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [loading, setLoading] = useState(true)
@@ -123,3 +123,4 @@ export default function MeetingsPage() {
     </div>
   )
 }
+

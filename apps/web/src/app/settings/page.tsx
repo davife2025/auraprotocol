@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
-export default function SettingsPage() {
+export default function SettingsPage(): JSX.Element {
   const [agents, setAgents] = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
   const [saving, setSaving] = useState(false)
@@ -143,3 +143,4 @@ export default function SettingsPage() {
     </div>
   )
 }
+

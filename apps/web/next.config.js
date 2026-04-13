@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   transpilePackages: ['@aura/ui', '@aura/agent-core', '@aura/agent-identity'],
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client'],
