@@ -75,18 +75,20 @@ export default function MeetingDetailPage() {
       .finally(() => setLoading(false))
   }, [id, router])
 
-  useEffect(() => {
-    if (meeting?.status === 'ACTIVE') {
-      const token = localStorage.getItem('aura_token')
-      if (!token) return
-      const interval = setInterval(() => {
-        fetch(`/api/v1/meetings/${id}`, { headers: { Authorization: `Bearer ${token}` } })
-          .then(r => r.json())
-          .then(d => setMeeting(d.meeting ?? d))
-      }, 5000)
-      return () => clearInterval(interval)
-    }
-  }, [meeting?.status, id])
+ useEffect(() => {
+  if (meeting?.status !== 'ACTIVE') return
+
+  const token = localStorage.getItem('aura_token')
+  if (!token) return
+
+  const interval = setInterval(() => {
+    fetch(`/api/v1/meetings/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => setMeeting(d.meeting ?? d))
+  }, 5000)
+
+  return () => clearInterval(interval)
+}, [meeting?.status, id])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
