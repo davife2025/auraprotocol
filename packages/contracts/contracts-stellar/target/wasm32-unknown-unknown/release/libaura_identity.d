@@ -1,0 +1,1 @@
+C:\Users\USER\Desktop\auraprotocol\packages\contracts\contracts-stellar\target\wasm32-unknown-unknown\release\libaura_identity.rlib: C:\Users\USER\Desktop\auraprotocol\packages\contracts\contracts-stellar\aura-identity\src\lib.rs

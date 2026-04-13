@@ -16,16 +16,20 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\"",
-    "contracts:compile": "pnpm --filter @aura/contracts compile",
-    "contracts:deploy:testnet": "pnpm --filter @aura/contracts deploy:testnet",
-    "contracts:deploy:mainnet": "pnpm --filter @aura/contracts deploy:mainnet",
+    "contracts:deploy:testnet": "npx tsx packages/contracts/scripts/deploy-stellar.ts --network testnet",
+    "contracts:deploy:mainnet": "npx tsx packages/contracts/scripts/deploy-stellar.ts --network mainnet",
     "db:generate": "pnpm --filter @aura/db generate",
     "db:migrate": "pnpm --filter @aura/db migrate:dev",
-    "db:studio": "pnpm --filter @aura/db studio"
+    "db:studio": "pnpm --filter @aura/db studio",
+    "contracts:build": "cd packages/contracts/contracts-stellar && cargo build --target wasm32-unknown-unknown --release",
+    "stellar:fund:testnet": "curl \"https://friendbot.stellar.org?addr=$(cat .stellar-address)\""
   },
   "devDependencies": {
-    "turbo": "^2.0.0",
     "prettier": "^3.3.0",
+    "turbo": "^2.0.0",
     "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^12.3.0"
   }
 }

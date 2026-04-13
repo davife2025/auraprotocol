@@ -24,7 +24,7 @@ const NICHE_COLORS: Record<string, string> = {
   monad: 'bg-aura-100 text-aura-700 dark:bg-aura-900/30 dark:text-aura-300',
 }
 
-export default function RoomsPage(): JSX.Element {
+export default function RoomsPage() {
   const [rooms, setRooms] = useState<Room[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -124,4 +124,3 @@ export default function RoomsPage(): JSX.Element {
     </div>
   )
 }
-

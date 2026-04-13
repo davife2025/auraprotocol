@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-export default function HomePage(): JSX.Element {
+export default function HomePage() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-aura-50 to-white dark:from-aura-900 dark:to-black px-4">
       <div className="max-w-2xl text-center space-y-6">
@@ -37,4 +37,3 @@ export default function HomePage(): JSX.Element {
     </main>
   )
 }
-

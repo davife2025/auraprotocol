@@ -6,7 +6,7 @@ import { useAccount, useSignMessage } from 'wagmi'
 
 const STEPS = ['Connect wallet', 'Name your agent', 'Set personality', 'Set permissions', 'Mint identity']
 
-export default function OnboardingPage(): JSX.Element {
+export default function OnboardingPage() {
   const router = useRouter()
   const { address, isConnected } = useAccount()
   const { signMessageAsync } = useSignMessage()
@@ -79,7 +79,7 @@ export default function OnboardingPage(): JSX.Element {
       <div className="w-full max-w-lg">
         {/* Progress */}
         <div className="flex items-center gap-2 mb-8">
-          {STEPS.map((_s, i) => (
+          {STEPS.map((s, i) => (
             <div key={i} className="flex items-center gap-2">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors
                 ${i < step ? 'bg-teal-500 text-white' : i === step ? 'bg-aura-600 text-white' : 'bg-gray-200 dark:bg-gray-800 text-gray-400'}`}>
@@ -177,7 +177,7 @@ export default function OnboardingPage(): JSX.Element {
                   { key: 'canCommitTo', label: '✅ Can commit to', color: 'teal' },
                   { key: 'cannotCommitTo', label: '🚫 Cannot commit to', color: 'red' },
                   { key: 'escalateIf', label: '⚡ Always escalate if', color: 'amber' },
-                ].map(({ key, label, color: _color }) => (
+                ].map(({ key, label, color }) => (
                   <div key={key} className="p-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{label}</p>
                     <div className="flex flex-wrap gap-1.5">
@@ -234,4 +234,3 @@ export default function OnboardingPage(): JSX.Element {
     </div>
   )
 }
-

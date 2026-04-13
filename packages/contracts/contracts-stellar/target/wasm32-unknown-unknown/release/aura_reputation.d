@@ -1,0 +1,1 @@
+C:\Users\USER\Desktop\auraprotocol\packages\contracts\contracts-stellar\target\wasm32-unknown-unknown\release\aura_reputation.wasm: C:\Users\USER\Desktop\auraprotocol\packages\contracts\contracts-stellar\aura-reputation\src\lib.rs

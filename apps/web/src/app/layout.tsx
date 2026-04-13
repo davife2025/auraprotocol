@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   icons: { icon: '/favicon.ico' },
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }): JSX.Element {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
@@ -20,4 +20,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
     </html>
   )
 }
-

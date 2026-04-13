@@ -1,0 +1,1 @@
+C:\Users\USER\Desktop\auraprotocol\packages\contracts\contracts-stellar\target\wasm32v1-none\release\aura_permissions.wasm: C:\Users\USER\Desktop\auraprotocol\packages\contracts\contracts-stellar\aura-permissions\src\lib.rs

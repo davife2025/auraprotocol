@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 
 interface Agent { id: string; name: string; status: string; reputationScore: number; _count?: { memories: number; meetingParticipants: number } }
@@ -9,7 +9,7 @@ interface Meeting { id: string; title: string; status: string; scheduledAt: stri
 interface Connection { id: string; initiator: { name: string }; receiver: { name: string }; alignmentScore: number; _count: { chatMessages: number } }
 
 export function DashboardShell() {
-
+  const { data: session } = useSession()
   const [agents, setAgents] = useState<Agent[]>([])
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [connections, setConnections] = useState<Connection[]>([])

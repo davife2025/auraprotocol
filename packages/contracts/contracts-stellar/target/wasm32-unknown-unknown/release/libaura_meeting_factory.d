@@ -1,0 +1,1 @@
+C:\Users\USER\Desktop\auraprotocol\packages\contracts\contracts-stellar\target\wasm32-unknown-unknown\release\libaura_meeting_factory.rlib: C:\Users\USER\Desktop\auraprotocol\packages\contracts\contracts-stellar\aura-meeting-factory\src\lib.rs
