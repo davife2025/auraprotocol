@@ -1,15 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
 import Link from 'next/link'
+import { useStellarWallet } from '@/components/ui/Providers'
+import { truncateStellarAddress } from '@/lib/stellar'
 
 interface Agent { id: string; name: string; status: string; reputationScore: number; _count?: { memories: number; meetingParticipants: number } }
 interface Meeting { id: string; title: string; status: string; scheduledAt: string; mode: string }
 interface Connection { id: string; initiator: { name: string }; receiver: { name: string }; alignmentScore: number; _count: { chatMessages: number } }
 
 export function DashboardShell() {
-  const { data: session } = useSession()
+  const { publicKey, disconnect } = useStellarWallet()
   const [agents, setAgents] = useState<Agent[]>([])
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [connections, setConnections] = useState<Connection[]>([])
@@ -49,6 +50,12 @@ export function DashboardShell() {
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 dark:bg-teal-900/30">
               <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
               <span className="text-xs text-teal-700 dark:text-teal-300 font-medium">{primaryAgent.name} active</span>
+            </div>
+          )}
+          {publicKey && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 font-mono hidden sm:block">{truncateStellarAddress(publicKey, 4)}</span>
+              <button onClick={disconnect} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">Sign out</button>
             </div>
           )}
         </div>
