@@ -1,8 +1,7 @@
-import { createPublicClient, createWalletClient, http, keccak256, toUtf8Bytes, type PublicClient, type WalletClient } from 'viem'
+import { createPublicClient, createWalletClient, http, keccak256, toBytes, type PublicClient, type WalletClient } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { AURA_MEETING_FACTORY_ABI } from '../abis/AuraMeetingFactory.js'
 import type { ContractAddresses } from '../types/index.js'
-
 export interface MeetingSettlementParams {
   meetingId: string
   transcript: Array<{ agentId: string; message: string; timestamp: string }>
@@ -48,7 +47,7 @@ export class MeetingClient {
       commitments: params.commitments,
       settledAt: new Date().toISOString(),
     })
-    const outcomeHash = keccak256(toUtf8Bytes(outcomeData) as any) as `0x${string}`
+   const outcomeHash = keccak256(toBytes(outcomeData)) as `0x${string}`
 
     return await this.walletClient.writeContract({
       address: this.contracts.meetingFactory!,

@@ -58,7 +58,7 @@ export class IdentityClient {
         abi: AURA_IDENTITY_ABI,
         functionName: 'getIdentity',
         args: [walletAddress],
-      }) as any[]
+     }) as unknown as any[]
 
       return {
         tokenId: result[0] as bigint,
