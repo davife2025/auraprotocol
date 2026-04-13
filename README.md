@@ -1,16 +1,24 @@
 <div align="center">
 
+<br/>
+
 # Aura Protocol
 
 ### Your presence, everywhere.
 
-Sovereign AI agents representing you in meetings, networking, and commerce —  
-anchored by onchain identity on [Monad](https://monad.xyz).
+Sovereign AI agents representing you in meetings, networking, and commerce —
+anchored by onchain identity on **Stellar**.
 
-[![Built on Monad](https://img.shields.io/badge/Built%20on-Monad-7F77DD?style=flat-square)](https://monad.xyz)
+<br/>
+
+[![Built on Stellar](https://img.shields.io/badge/Built%20on-Stellar-1D9E75?style=flat-square&logo=stellar&logoColor=white)](https://stellar.org)
+[![Soroban](https://img.shields.io/badge/Smart%20Contracts-Soroban%20%2F%20Rust-26215C?style=flat-square)](https://stellar.org/soroban)
+[![Powered by Claude](https://img.shields.io/badge/AI-Claude%20(Anthropic)-D97706?style=flat-square)](https://anthropic.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-1D9E75?style=flat-square)](LICENSE)
 [![pnpm](https://img.shields.io/badge/pnpm-9+-orange?style=flat-square)](https://pnpm.io)
-[![Turborepo](https://img.shields.io/badge/Turborepo-monorepo-26215C?style=flat-square)](https://turbo.build)
+[![Turborepo](https://img.shields.io/badge/monorepo-Turborepo-EF4444?style=flat-square)](https://turbo.build)
+
+<br/>
 
 </div>
 
@@ -18,95 +26,146 @@ anchored by onchain identity on [Monad](https://monad.xyz).
 
 ## What is Aura Protocol?
 
-Every person is limited to one presence at a time. Aura Protocol breaks that limit.
+Every person on earth is physically limited to one presence at one time. Aura Protocol breaks that limit.
 
-Your Aura agent attends meetings while you're busy, networks with aligned professionals in niche rooms, builds relationships, and surfaces only the opportunities that matter — all simultaneously, all as you.
+Your **Aura agent** attends meetings while you're busy, networks with aligned professionals in niche rooms, builds relationships, and surfaces only the opportunities that matter — all simultaneously, all as *you*.
 
-**The core difference from every other AI agent:** your Aura agent has a *sovereign onchain identity* anchored on Monad. Every agent is verifiably yours, every commitment it makes is immutably recorded, and its authority is enforced by smart contracts — not just software.
+The critical difference from every other AI assistant: your Aura agent has a **sovereign onchain identity anchored on Stellar**. It is verifiably yours, its authority is enforced by Soroban smart contracts, and every commitment it makes is written immutably to the blockchain. Not a tool. A representative.
 
 ---
 
-## Key Features
+## Why Stellar?
 
-### Meeting Rooms
-Three meeting modes — full agent (no humans needed), hybrid, and observer. Your agent attends with full authority within your permission limits. Every commitment is logged onchain. AI-generated summaries delivered after every session.
+We migrated from EVM to Stellar / Soroban for three reasons directly tied to the product working at scale.
 
-### Aura Rooms  
-Niche networking spaces where agents discover, resonate, and connect. Your agent scans rooms 24/7, computes alignment scores against other agents, and surfaces only the connections worth your attention.
+**Transaction costs make agent microinteractions viable.** Agents make thousands of small onchain interactions per day — identity handshakes, commitment logs, reputation updates. On Ethereum these cost dollars each. On Stellar they cost fractions of a cent. This is the difference between a viable product and an unviable one.
 
-### Agent Chat
-Once two agents resonate, they begin a structured conversation — qualifying the relationship, finding collaboration angles, proposing intros — before either human is involved.
+**Ledger close time matches agent conversation speed.** At 5 seconds today (targeting 2.5s with Protocol 23), Stellar confirms fast enough for agents to reference onchain state within a single conversation turn. 12-second Ethereum finality is too slow for real-time agent interactions.
 
-### Onchain Identity
-Every agent is backed by a soulbound NFT on Monad (`AuraIdentity.sol`). Non-transferable, verifiable, and revocable only by you. No impersonation. No fakes.
-
-### Permission Schema
-Authority limits are written into smart contracts (`AuraPermissions.sol`). Your agent *architecturally cannot* exceed what you've authorised — not just a software guardrail.
-
-### Reputation System
-Every interaction builds an immutable onchain reputation score (`AuraReputation.sol`). An agent with a 95% commitment rate and 500 quality connections is provably trustworthy.
+**Soroban's architecture mirrors Aura's.** Soroban contracts must declare all storage access upfront in a footprint — the same constraint enabling Stellar's parallel execution. Aura's multi-instance agent model maps directly onto this: each agent instance has a defined state footprint, enabling true parallelism at both the application and blockchain level simultaneously.
 
 ---
 
 ## Architecture
 
 ```
-aura-protocol/                    ← Turborepo monorepo
-├── apps/
-│   ├── web/                      ← Next.js 14 — main user app
-│   ├── mobile/                   ← React Native / Expo
-│   ├── api/                      ← Fastify REST + WebSocket API
-│   ├── agent-runner/             ← BullMQ agent execution engine
-│   └── docs/                     ← Developer documentation
-│
-├── packages/
-│   ├── agent-core/               ← LLM engine, memory, decisions, lifecycle
-│   ├── agent-identity/           ← Onchain identity client (viem)
-│   ├── acp/                      ← Agent Communication Protocol
-│   ├── ui/                       ← Shared React component library
-│   ├── db/                       ← Prisma schema + migrations (12 models)
-│   ├── contracts/                ← Solidity smart contracts (Monad)
-│   └── config/                   ← Shared ESLint, TypeScript, Tailwind
-│
-└── infra/
-    ├── docker/                   ← Docker Compose for local dev
-    ├── ci/                       ← GitHub Actions workflows
-    └── terraform/                ← Cloud infrastructure as code
+┌──────────────────────────────────────────────────┐
+│                    User Layer                     │
+│      Web App (Next.js 14)  ·  Mobile (Expo)       │
+└────────────────────┬─────────────────────────────┘
+                     │
+┌────────────────────▼─────────────────────────────┐
+│                 Agent Core Layer                  │
+│   LLM reasoning (Claude)  ·  Vector memory        │
+│   Permission enforcer  ·  Multi-instance runner   │
+└────────────────────┬─────────────────────────────┘
+                     │
+┌────────────────────▼─────────────────────────────┐
+│                  Feature Layer                    │
+│   Meeting Rooms  ·  Aura Rooms  ·  Agent Chat     │
+└────────────────────┬─────────────────────────────┘
+                     │
+┌────────────────────▼─────────────────────────────┐
+│               Protocol Layer (ACP)                │
+│   Identity handshake  ·  Commitment settlement    │
+│   Reputation scoring  ·  Permission verification  │
+└────────────────────┬─────────────────────────────┘
+                     │
+┌────────────────────▼─────────────────────────────┐
+│              Stellar / Soroban Layer              │
+│  AuraIdentity · AuraReputation · AuraPermissions  │
+│  MeetingFactory · AuraToken ($AURA)               │
+└──────────────────────────────────────────────────┘
 ```
-
-### System layers
-
-| Layer | What it does |
-|-------|-------------|
-| **User** | Web + mobile app, live dashboard, notifications |
-| **Agent Core** | Persistent memory, LLM reasoning, permission enforcement, multi-instance |
-| **Features** | Meeting rooms, Aura Rooms, agent-to-agent chat |
-| **Protocol** | ACP handshake, commitment settlement, reputation |
-| **Identity** | Soulbound NFT, smart contract permissions, token economy |
-| **Monad** | 10,000 TPS, sub-second finality, EVM compatibility |
 
 ---
 
-## Smart Contracts
+## Monorepo Structure
 
-All contracts are in `packages/contracts/contracts/` and deploy to Monad.
+```
+aura-protocol/
+├── apps/
+│   ├── web/                    Next.js 14 — main web app
+│   ├── mobile/                 React Native / Expo — iOS + Android
+│   ├── api/                    Fastify REST + WebSocket API
+│   ├── agent-runner/           BullMQ background agent execution engine
+│   └── docs/                   Mintlify developer documentation
+│
+├── packages/
+│   ├── agent-core/             LLM engine, memory, decisions, lifecycle
+│   ├── stellar-client/         Soroban contract clients (replaces viem/wagmi)
+│   ├── acp/                    Agent Communication Protocol
+│   ├── ui/                     Shared React component library
+│   ├── db/                     Prisma schema + PostgreSQL migrations
+│   └── config/                 Shared ESLint, TypeScript, Tailwind configs
+│
+├── packages/contracts/
+│   └── contracts-stellar/      Soroban smart contracts (Rust → WASM)
+│       ├── aura-identity/      Soulbound identity NFT
+│       ├── aura-reputation/    Immutable reputation ledger
+│       ├── aura-permissions/   Permission schema registry
+│       ├── aura-meeting-factory/  Meeting lifecycle + onchain settlement
+│       ├── aura-token/         $AURA staking + tier access gating
+│       └── tests/              Soroban integration tests
+│
+├── infra/
+│   ├── docker/                 Docker Compose for local dev
+│   ├── ci/                     GitHub Actions workflows
+│   └── terraform/              AWS infrastructure as code
+│
+├── vercel.json                 Vercel deployment config (web)
+├── render.yaml                 Render deployment config (API + DB + Redis)
+├── DEPLOYMENT.md               Full deployment guide
+└── LAUNCH.md                   Pre-launch checklist
+```
+
+---
+
+## Smart Contracts (Soroban / Rust)
+
+All contracts are written in **Rust**, compiled to **WASM**, and deployed on Stellar via the Soroban smart contract platform.
 
 | Contract | Purpose |
 |----------|---------|
-| `AuraIdentity.sol` | Soulbound identity NFT — one per agent, non-transferable |
-| `AuraRegistry.sol` | Global agent registry — maps Aura IDs to wallet addresses |
-| `AuraReputation.sol` | Immutable reputation ledger — written by protocol, not users |
-| `AuraPermissions.sol` | Permission schema registry — hard-enforced authority limits |
-| `MeetingRoom.sol` | Per-meeting contract — logs commitments + settles outcomes onchain |
+| `AuraIdentity` | Soulbound (non-transferable) identity record — permanently bound to a Stellar keypair. Cannot be sold, delegated, or transferred. |
+| `AuraReputation` | Append-only reputation ledger written only by authorised protocol contracts. Scores cannot be purchased or gamed. |
+| `AuraPermissions` | Stores the hash and encoded rules of each agent's permission schema with version history. Hard limits enforced at protocol level. |
+| `MeetingFactory` | Creates meeting records, settles SHA-256 outcome hashes onchain, and emits reputation events after each meeting. |
+| `AuraToken` | $AURA staking contract wrapping Stellar's native Asset Contract (SEP-41). Staking unlocks subscription tiers and premium rooms. |
+
+### Build and test
+
+```bash
+# Prerequisites
+rustup target add wasm32-unknown-unknown
+cargo install soroban-cli --locked
+
+# Build all contracts
+cd packages/contracts/contracts-stellar
+cargo build --target wasm32-unknown-unknown --release
+
+# Run integration tests
+cargo test --features testutils
+
+# Deploy to Stellar testnet
+cd ../../..
+npx tsx packages/contracts/scripts/deploy-stellar.ts --network testnet
+
+# Deploy to Stellar mainnet
+npx tsx packages/contracts/scripts/deploy-stellar.ts --network mainnet
+```
 
 ---
 
 ## Quick Start
 
 ### Prerequisites
-- Node.js ≥ 20
-- pnpm ≥ 9
+
+- Node.js >= 20
+- pnpm >= 9
 - Docker + Docker Compose
+- Rust (for contract builds)
+- [Freighter wallet](https://www.freighter.app/) browser extension
 
 ### 1. Clone and install
 
@@ -120,8 +179,9 @@ pnpm install
 
 ```bash
 cp .env.example .env
-# Required: ANTHROPIC_API_KEY, NEXTAUTH_SECRET
-# Generate secret: openssl rand -base64 32
+# Fill in at minimum:
+# ANTHROPIC_API_KEY, NEXTAUTH_SECRET, JWT_SECRET
+# STELLAR_NETWORK, STELLAR_SECRET_KEY
 ```
 
 ### 3. Start infrastructure
@@ -133,8 +193,8 @@ docker compose -f infra/docker/docker-compose.yml up postgres redis -d
 ### 4. Database
 
 ```bash
-pnpm db:generate   # generate Prisma client
-pnpm db:migrate    # run migrations
+pnpm db:generate    # Generate Prisma client
+pnpm db:migrate     # Run migrations
 ```
 
 ### 5. Run
@@ -147,46 +207,63 @@ pnpm dev
 |---------|-----|
 | Web app | http://localhost:3000 |
 | API | http://localhost:3001 |
-| API health | http://localhost:3001/health |
+| Health check | http://localhost:3001/health |
 
 ---
 
-## Deploy Contracts to Monad Testnet
+## Stellar Wallet — Freighter
+
+Aura Protocol uses **[Freighter](https://www.freighter.app/)** for authentication and signing — the official Stellar browser wallet.
+
+1. Install the Freighter extension from [freighter.app](https://www.freighter.app/)
+2. Create a Stellar account
+3. Fund your testnet account:
 
 ```bash
-# Add DEPLOYER_PRIVATE_KEY to .env
-pnpm contracts:compile
-pnpm contracts:deploy:testnet
-# Addresses saved to packages/contracts/deployments.json
+curl "https://friendbot.stellar.org?addr=YOUR_STELLAR_PUBLIC_KEY"
 ```
+
+On mobile, authentication flows through the web app via deeplink. Native Stellar mobile wallet support is on the roadmap.
 
 ---
 
 ## API Reference
 
-Base: `http://localhost:3001`
+Base URL: `http://localhost:3001`
 
 ```
-GET    /health
+# Auth
+GET  /api/v1/auth/nonce?address=G...   Get sign-in nonce
+POST /api/v1/auth/signin               Verify Stellar Ed25519 signature → JWT
+GET  /api/v1/auth/me                   Current user + agents + subscription
 
-POST   /api/v1/agents                    Create agent + mint identity
-GET    /api/v1/agents                    List user's agents
-PATCH  /api/v1/agents/:id/permissions    Update permission schema
-POST   /api/v1/agents/:id/pause          Pause agent
+# Agents
+GET   /api/v1/agents                   List user's agents
+POST  /api/v1/agents                   Create agent + queue Stellar identity mint
+PATCH /api/v1/agents/:id/permissions   Update permission schema → syncs to Soroban
+POST  /api/v1/agents/:id/pause         Terminate all active instances
 
-POST   /api/v1/meetings                  Create meeting room
-GET    /api/v1/meetings/:id/transcript   Get transcript
-POST   /api/v1/meetings/:id/settle       Settle onchain
-WS     /api/v1/meetings/:id/stream       Live meeting stream
+# Meetings
+POST /api/v1/meetings                  Create meeting room
+POST /api/v1/meetings/:id/start        Start + spawn agent instances
+POST /api/v1/meetings/:id/settle       Hash transcript → settle on Stellar
+GET  /api/v1/meetings/:id/transcript   Full transcript
+WS   /api/v1/meetings/:id/stream       Live stream (WebSocket)
 
-GET    /api/v1/rooms                     Browse niche rooms
-POST   /api/v1/rooms/:id/join            Agent joins room
-POST   /api/v1/rooms/resonate            Send resonance signal
-WS     /api/v1/rooms/:id/presence        Live room presence
+# Rooms
+GET  /api/v1/rooms                     Browse niche rooms
+POST /api/v1/rooms/:id/join            Send agent into room
+POST /api/v1/rooms/resonate            Compute alignment + send signal
+GET  /api/v1/rooms/connections         Active agent connections
+WS   /api/v1/rooms/:id/presence        Live presence (WebSocket)
 
-POST   /api/v1/identity/mint             Mint soulbound NFT
-GET    /api/v1/identity/:wallet          Resolve identity
-GET    /api/v1/identity/:wallet/reputation  Reputation breakdown
+# Identity
+GET  /api/v1/identity/:address              Onchain identity
+GET  /api/v1/identity/:address/reputation   Onchain reputation breakdown
+
+# Billing
+POST /api/v1/billing/checkout          Stripe checkout session
+GET  /api/v1/billing/subscription      Current plan
 ```
 
 ---
@@ -196,16 +273,27 @@ GET    /api/v1/identity/:wallet/reputation  Reputation breakdown
 ### `@aura/agent-core`
 
 ```typescript
-import { AgentLifecycle, PermissionEnforcer } from '@aura/agent-core'
+import { agentService } from '@aura/agent-core'
 
-const lifecycle = new AgentLifecycle()
-const instance = lifecycle.spawnInstance(agentProfile)
+const instance = agentService.spawnInstance(agentProfile)
+const response = await agentService.chat(instance.instanceId, history, context)
+const decision = await agentService.decide(instance.instanceId, { situation, stakes })
+const score    = await agentService.computeResonanceScore(instance.instanceId, theirProfile)
+```
 
-const enforcer = lifecycle.getEnforcer(instance.instanceId)
-const { allowed, reason } = enforcer.canCommitToMeeting('schedule a follow-up')
+### `@aura/stellar-client`
 
-const engine = lifecycle.getEngine(instance.instanceId)
-const response = await engine.generateResponse(conversationHistory, memories)
+```typescript
+import { StellarIdentityClient, StellarMeetingClient, STELLAR_NETWORKS } from '@aura/stellar-client'
+
+const identityClient = new StellarIdentityClient(secretKey, config)
+const txHash  = await identityClient.mintIdentity({ toAddress, auraId, metadataUri, permissionsHash })
+const identity = await identityClient.getIdentity(stellarAddress)
+const rep      = await identityClient.getReputation(stellarAddress)
+
+const meetingClient = new StellarMeetingClient(secretKey, config)
+await meetingClient.createMeeting(meetingId, participants)
+await meetingClient.settleMeeting({ meetingId, transcript, commitments, participants, scores })
 ```
 
 ### `@aura/acp`
@@ -213,42 +301,15 @@ const response = await engine.generateResponse(conversationHistory, memories)
 ```typescript
 import { ACPHandshake, ACPMessageBuilder } from '@aura/acp'
 
-// Build handshake
-const init = ACPHandshake.buildInit({ fromAgentId, toAgentId, ...params })
+const init    = ACPHandshake.buildInit({ fromAgentId, toAgentId, ...params })
 const isValid = await ACPHandshake.verifyEnvelope(receivedEnvelope)
+const session = ACPHandshake.createSession(completeEnvelope, agentAId, agentBId)
 
-// Build messages
 const builder = new ACPMessageBuilder(agentId, session)
-const turn = builder.meetingTurn('Agreed — I will schedule a demo', 3, otherAgentId)
-const commitment = builder.meetingCommitment('Schedule demo by Thursday', 'calendar', otherAgentId)
+const turn       = builder.meetingTurn('I agree to the timeline', 3, otherAgentId)
+const commitment = builder.meetingCommitment('Deliver draft Friday', 'deliverable', otherAgentId)
+const resonance  = builder.resonate(roomId, 94, toAgentId, 'Collaboration proposal')
 ```
-
-### `@aura/agent-identity`
-
-```typescript
-import { IdentityClient } from '@aura/agent-identity'
-
-const client = new IdentityClient(rpcUrl, privateKey, contractAddresses)
-
-const { txHash } = await client.mintIdentity({ walletAddress, metadataUri, permissionsHash })
-const identity = await client.resolveIdentity(walletAddress)
-const reputation = await client.getReputation(walletAddress)
-```
-
----
-
-## Build Sessions
-
-| # | Focus | Status |
-|---|-------|--------|
-| 1 | Monorepo, tooling, scaffolding | ✅ Complete |
-| 2 | Monad smart contracts | 🔄 In progress |
-| 3 | Agent core engine + vector memory | 🔜 |
-| 4 | ACP protocol + API server | 🔜 |
-| 5 | Meeting rooms (full feature) | 🔜 |
-| 6 | Aura Rooms + agent chat | 🔜 |
-| 7 | Web + mobile UI | 🔜 |
-| 8 | $AURA token + mainnet launch | 🔜 |
 
 ---
 
@@ -256,42 +317,95 @@ const reputation = await client.getReputation(walletAddress)
 
 | Layer | Technology |
 |-------|-----------|
-| Blockchain | Monad (EVM, 10,000 TPS, 400ms blocks) |
-| Smart contracts | Solidity 0.8.24 + Hardhat + OpenZeppelin |
-| Web | Next.js 14 + React 18 + Tailwind CSS |
-| Mobile | React Native + Expo |
-| API | Fastify + WebSocket (Socket.io) |
-| Agent jobs | BullMQ + Redis |
-| AI | Anthropic Claude (claude-sonnet-4) |
-| Database | PostgreSQL + Prisma |
-| Onchain client | viem v2 + wagmi v2 |
-| Auth | NextAuth.js + wallet signature (EIP-191) |
-| Monorepo | Turborepo + pnpm workspaces |
-| CI | GitHub Actions |
-| Containers | Docker + Docker Compose |
+| Blockchain | Stellar · Soroban smart contracts |
+| Smart contracts | Rust 2021 · soroban-sdk 21.0 |
+| Web app | Next.js 14 · React 18 · Tailwind CSS |
+| Mobile | React Native · Expo 51 · Expo Router |
+| Wallet | Freighter (Stellar browser extension) |
+| API | Fastify 4 · WebSocket · JWT |
+| Agent jobs | BullMQ · Redis |
+| AI | Anthropic Claude (`claude-sonnet-4-20250514`) |
+| Vector memory | Pinecone |
+| Database | PostgreSQL 16 · Prisma ORM |
+| Stellar client | `@stellar/stellar-sdk` v12 |
+| Auth | NextAuth.js · Stellar Ed25519 signature |
+| Billing | Stripe |
+| Monorepo | Turborepo · pnpm workspaces |
+| CI/CD | GitHub Actions |
+| Hosting | Vercel (web) · Render (API + workers + DB) |
 
 ---
 
-## Why Monad?
+## Migration Reference — Monad → Stellar
 
-Aura Protocol is a Monad-native project — not a port.
+| Monad (old) | Stellar (new) |
+|-------------|---------------|
+| Solidity `.sol` contracts | Rust `lib.rs` → WASM via Soroban |
+| Hardhat deploy | `soroban-cli` + `cargo` |
+| `viem` / `wagmi` | `@stellar/stellar-sdk` |
+| `packages/agent-identity` | `packages/stellar-client` |
+| MetaMask / WalletConnect | Freighter |
+| EIP-191 wallet signature | Stellar Ed25519 signature |
+| `MONAD_RPC_URL` | `STELLAR_RPC_URL` |
+| `DEPLOYER_PRIVATE_KEY` (0x hex) | `STELLAR_SECRET_KEY` (S...) |
+| Contract addresses (0x...) | Contract IDs (C...) |
+| `wagmiConfig` + `useAccount()` | `StellarWalletContext` + `useStellarWallet()` |
+| Chain ID in env vars | `STELLAR_NETWORK_PASSPHRASE` |
 
-**Parallel execution** mirrors multi-instance agents. When your agent runs in 5 meetings simultaneously, Monad's architecture processes those transactions in parallel. This isn't a coincidence — it's a design match.
+---
 
-**10,000 TPS** means agent micro-interactions (handshakes, commitment logs, reputation updates) are economically viable at fractions of a cent. On Ethereum mainnet this product is impossible.
+## Subscription Tiers
 
-**Sub-second finality** means "your agent just committed to something" is confirmed before the conversation ends — not minutes later.
+| Plan | Price | Agents | Meetings | $AURA stake |
+|------|-------|--------|----------|-------------|
+| Free | $0 | 1 | 3/month | — |
+| Pro | $19/mo | 1 | Unlimited | or 1,000 $AURA |
+| Business | $79/mo | 5 | Unlimited | or 10,000 $AURA |
+| Enterprise | Custom | Unlimited | Unlimited | Custom |
 
-**Full EVM compatibility** means we deploy standard Solidity, use viem/ethers, and plug into the entire Ethereum tooling ecosystem immediately.
+$AURA staking provides the same access as the paid tier at a discount — aligning token holders with protocol growth.
+
+---
+
+## Deployment
+
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for the complete guide covering Stellar contract deployment, Render (API + agent-runner + PostgreSQL + Redis), and Vercel (web app).
+
+```bash
+# Deploy all Stellar contracts
+npx tsx packages/contracts/scripts/deploy-stellar.ts --network mainnet
+
+# Render picks up render.yaml automatically on push to main
+git push origin main
+
+# Deploy web to Vercel
+vercel --prod
+```
+
+---
+
+## Stellar Resources
+
+| Resource | Link |
+|----------|------|
+| Developer docs | https://developers.stellar.org |
+| Soroban Rust SDK | https://docs.rs/soroban-sdk |
+| Install soroban-cli | `cargo install soroban-cli --locked` |
+| Freighter wallet | https://www.freighter.app |
+| Testnet faucet | https://friendbot.stellar.org |
+| Testnet explorer | https://stellar.expert/explorer/testnet |
+| Mainnet explorer | https://stellar.expert/explorer/public |
+| SCF grants (up to $150K XLM) | https://communityfund.stellar.org |
+| Stellar Discord | https://discord.gg/stellar |
 
 ---
 
 ## Contributing
 
 1. Branch from `develop`
-2. Each PR maps to a build session — keep scope tight
+2. Keep PRs scoped — one session per PR
 3. All PRs must pass `pnpm lint` and `pnpm type-check`
-4. Contract changes require test coverage in `packages/contracts/test/`
+4. Contract changes must include Soroban tests: `cargo test --features testutils`
 5. Run `pnpm format` before committing
 
 ---
@@ -299,3 +413,13 @@ Aura Protocol is a Monad-native project — not a port.
 ## License
 
 MIT © Aura Protocol
+
+---
+
+<div align="center">
+
+Built on Stellar &nbsp;·&nbsp; Powered by Claude &nbsp;·&nbsp; Designed for humans
+
+*Every person deserves a sovereign digital representative.*
+
+</div>
