@@ -1,50 +1,69 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { meetingService } from '../services/meetingService.js'
-import { agentService } from '@aura/agent-core'
 
 const CreateMeetingSchema = z.object({
-  title: z.string().min(1).max(100),
-  agenda: z.string().max(2000).optional(),
-  mode: z.enum(['FULL_AGENT', 'HYBRID', 'OBSERVER']),
+  title:       z.string().min(1).max(100),
+  agenda:      z.string().max(2000).optional(),
+  mode:        z.enum(['FULL_AGENT', 'HYBRID', 'OBSERVER']),
   scheduledAt: z.string().datetime(),
-  invitees: z.array(z.object({ auraId: z.string(), role: z.string() })),
+  invitees:    z.array(z.object({ auraId: z.string(), role: z.string() })),
   rules: z.object({
     agentsCanMakeBindingCommitments: z.boolean().default(false),
-    recordOnchain: z.boolean().default(true),
+    recordOnchain:                   z.boolean().default(true),
   }),
 })
 
 export async function meetingRoutes(server: FastifyInstance) {
   server.get('/', { preHandler: [server.authenticate] }, async (request) => {
     const { userId } = request.user as { userId: string }
-    const meetings = await server.prisma.meeting.findMany({
-      where: { participants: { some: { agent: { userId } } } },
-      include: {
-        _count: { select: { participants: true, commitments: true, transcriptEntries: true } },
-      },
-      orderBy: { scheduledAt: 'desc' },
-    })
+
+    const { data: agentIds } = await server.supabase
+      .from('agents')
+      .select('id')
+      .eq('user_id', userId)
+
+    const ids = (agentIds ?? []).map((a: { id: string }) => a.id)
+
+    const { data: participantRows } = await server.supabase
+      .from('meeting_participants')
+      .select('meeting_id')
+      .in('agent_id', ids)
+
+    const meetingIds = [...new Set((participantRows ?? []).map((r: { meeting_id: string }) => r.meeting_id))]
+
+    const { data: meetings, error } = await server.supabase
+      .from('meetings')
+      .select('*, meeting_participants(count), meeting_commitments(count), transcript_entries(count)')
+      .in('id', meetingIds)
+      .order('scheduled_at', { ascending: false })
+
+   if (error) throw new Error(error.message)
     return { meetings }
   })
 
   server.post('/', { preHandler: [server.authenticate] }, async (request, reply) => {
     const { userId } = request.user as { userId: string }
-    const body = CreateMeetingSchema.parse(request.body)
+    const body    = CreateMeetingSchema.parse(request.body)
     const meeting = await meetingService.createMeeting(userId, body)
     return reply.status(201).send({ meeting })
   })
 
   server.get('/:id', { preHandler: [server.authenticate] }, async (request) => {
     const { id } = request.params as { id: string }
-    return server.prisma.meeting.findUniqueOrThrow({
-      where: { id },
-      include: {
-        participants: { include: { agent: { select: { id: true, name: true, reputationScore: true } } } },
-        commitments: true,
-        transcriptEntries: { orderBy: { turnNumber: 'asc' }, take: 20 },
-      },
-    })
+    const { data, error } = await server.supabase
+      .from('meetings')
+      .select(`
+        *,
+        meeting_participants(*, agents(id, name, reputation_score)),
+        meeting_commitments(*),
+        transcript_entries(* order by turn_number asc)
+      `)
+      .eq('id', id)
+      .single()
+
+    if (error) throw new Error(error.message)
+    return data
   })
 
   server.post('/:id/start', { preHandler: [server.authenticate] }, async (request) => {
@@ -64,8 +83,8 @@ export async function meetingRoutes(server: FastifyInstance) {
   })
 
   server.post('/:id/commitments', { preHandler: [server.authenticate] }, async (request, reply) => {
-    const { id } = request.params as { id: string }
-    const { agentId, commitment, commitmentType } = request.body as any
+    const { id }                                   = request.params as { id: string }
+    const { agentId, commitment, commitmentType }  = request.body as any
     const entry = await meetingService.logCommitment(id, agentId, commitment, commitmentType)
     return reply.status(201).send(entry)
   })
@@ -80,9 +99,7 @@ export async function meetingRoutes(server: FastifyInstance) {
         const msg = JSON.parse(rawMsg.toString())
 
         if (msg.type === 'agent_turn') {
-          // Record transcript entry
           await meetingService.addTranscriptEntry(id, msg.agentId, msg.message, msg.turnNumber)
-          // Broadcast to all connected clients
           socket.send(JSON.stringify({ type: 'transcript_entry', ...msg }))
         }
 
@@ -90,7 +107,7 @@ export async function meetingRoutes(server: FastifyInstance) {
           await meetingService.logCommitment(id, msg.agentId, msg.commitment, msg.commitmentType ?? 'general')
           socket.send(JSON.stringify({ type: 'commitment_logged', commitment: msg.commitment }))
         }
-      } catch (err) {
+      } catch {
         socket.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }))
       }
     })

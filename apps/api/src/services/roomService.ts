@@ -1,84 +1,109 @@
-import { prisma } from '../plugins/prisma.js'
+import { supabase } from '../plugins/supabase.js'
 import { agentService } from '@aura/agent-core'
 import { Queue } from 'bullmq'
 import pino from 'pino'
 
 const logger = pino({ level: process.env.LOG_LEVEL ?? 'info' })
-const roomQueue = new Queue('room-tasks', { connection: { host: process.env.REDIS_HOST ?? 'localhost', port: Number(process.env.REDIS_PORT ?? 6379) } })
+const roomQueue = new Queue('room-tasks', {
+  connection: {
+    host: process.env.REDIS_HOST ?? 'localhost',
+    port: Number(process.env.REDIS_PORT ?? 6379),
+  },
+})
 
-// Niche taxonomy — predefined rooms at launch
 export const NICHE_ROOMS = [
-  { name: 'Web3 Founders', niche: 'web3', description: 'Building on-chain products and protocols' },
-  { name: 'AI Builders', niche: 'ai', description: 'Developing AI applications and infrastructure' },
-  { name: 'Lagos Creatives', niche: 'creative', description: 'Nigerian and African creative ecosystem' },
-  { name: 'DeFi Traders', niche: 'defi', description: 'Decentralised finance strategies and alpha' },
-  { name: 'Product Designers', niche: 'design', description: 'UX, UI, and product thinking' },
-  { name: 'Climate Tech', niche: 'climate', description: 'Sustainability and green technology' },
-  { name: 'Music Industry', niche: 'music', description: 'Artists, producers, and music business' },
-  { name: 'VC & Investors', niche: 'investing', description: 'Early-stage investing and deal flow' },
-  { name: 'DevRel & Community', niche: 'devrel', description: 'Developer relations and community building' },
-  { name: 'Monad Ecosystem', niche: 'monad', description: 'Projects and builders on Monad' },
+  { name: 'Web3 Founders',      niche: 'web3',      description: 'Building on-chain products and protocols' },
+  { name: 'AI Builders',        niche: 'ai',         description: 'Developing AI applications and infrastructure' },
+  { name: 'Lagos Creatives',    niche: 'creative',   description: 'Nigerian and African creative ecosystem' },
+  { name: 'DeFi Traders',       niche: 'defi',       description: 'Decentralised finance strategies and alpha' },
+  { name: 'Product Designers',  niche: 'design',     description: 'UX, UI, and product thinking' },
+  { name: 'Climate Tech',       niche: 'climate',    description: 'Sustainability and green technology' },
+  { name: 'Music Industry',     niche: 'music',      description: 'Artists, producers, and music business' },
+  { name: 'VC & Investors',     niche: 'investing',  description: 'Early-stage investing and deal flow' },
+  { name: 'DevRel & Community', niche: 'devrel',     description: 'Developer relations and community building' },
+  { name: 'Monad Ecosystem',    niche: 'monad',      description: 'Projects and builders on Monad' },
 ]
 
 export class RoomService {
   async seedDefaultRooms() {
     for (const room of NICHE_ROOMS) {
-      await prisma.room.upsert({
-        where: { id: room.niche }, // use niche as stable id for seeding
-        update: {},
-        create: { id: room.niche, name: room.name, niche: room.niche, description: room.description },
-      })
+      await supabase.from('rooms').upsert(
+        { id: room.niche, name: room.name, niche: room.niche, description: room.description },
+        { onConflict: 'id', ignoreDuplicates: true }
+      )
     }
     logger.info('Default rooms seeded')
   }
 
   async getRooms(niche?: string, search?: string) {
-    return prisma.room.findMany({
-      where: {
-        ...(niche ? { niche } : {}),
-        ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
-      },
-      include: { _count: { select: { members: true, presences: true } } },
-      orderBy: { createdAt: 'desc' },
-    })
+    let query = supabase
+      .from('rooms')
+      .select('*, room_members(count), room_presences(count)')
+      .order('created_at', { ascending: false })
+
+    if (niche)  query = query.eq('niche', niche)
+    if (search) query = query.ilike('name', `%${search}%`)
+
+    const { data, error } = await query
+    if (error) throw new Error(error.message)
+    return data
   }
 
-  async createRoom(userId: string, data: { name: string; niche: string; description?: string; isPremium?: boolean; stakeRequired?: string }) {
-    return prisma.room.create({ data: { ...data, isPremium: data.isPremium ?? false } })
+  async createRoom(_userId: string, data: {
+    name: string
+    niche: string
+    description?: string
+    isPremium?: boolean
+    stakeRequired?: string
+  }) {
+    const { data: room, error } = await supabase
+      .from('rooms')
+      .insert({
+        name:           data.name,
+        niche:          data.niche,
+        description:    data.description,
+        is_premium:     data.isPremium ?? false,
+        stake_required: data.stakeRequired,
+      })
+      .select()
+      .single()
+
+    if (error) throw new Error(error.message)
+    return room
   }
 
   async joinRoom(roomId: string, userId: string, agentId: string) {
-    await prisma.roomMember.upsert({
-      where: { roomId_userId: { roomId, userId } },
-      update: {},
-      create: { roomId, userId },
-    })
+    await supabase.from('room_members').upsert(
+      { room_id: roomId, user_id: userId },
+      { onConflict: 'room_id,user_id', ignoreDuplicates: true }
+    )
 
-    await prisma.roomPresence.create({ data: { roomId, agentId } })
+    await supabase.from('room_presences').insert({ room_id: roomId, agent_id: agentId })
 
-    await roomQueue.add('scan_room', {
-      type: 'scan_room',
-      roomId,
-      agentId,
-      payload: {},
-    })
+    await roomQueue.add('scan_room', { type: 'scan_room', roomId, agentId, payload: {} })
 
     logger.info({ roomId, agentId }, 'Agent joined room')
     return { roomId, agentId, joined: true }
   }
 
   async leaveRoom(roomId: string, agentId: string) {
-    await prisma.roomPresence.updateMany({
-      where: { roomId, agentId, leftAt: null },
-      data: { leftAt: new Date() },
-    })
+    await supabase
+      .from('room_presences')
+      .update({ left_at: new Date().toISOString() })
+      .eq('room_id', roomId)
+      .eq('agent_id', agentId)
+      .is('left_at', null)
   }
 
   async getAgentsInRoom(roomId: string) {
-    return prisma.roomPresence.findMany({
-      where: { roomId, leftAt: null },
-      include: { agent: { select: { id: true, name: true, reputationScore: true, communicationStyle: true } } },
-    })
+    const { data, error } = await supabase
+      .from('room_presences')
+      .select('*, agents(id, name, reputation_score, communication_style)')
+      .eq('room_id', roomId)
+      .is('left_at', null)
+
+    if (error) throw new Error(error.message)
+    return data
   }
 
   async computeResonance(fromAgentId: string, toAgentId: string, roomId: string): Promise<{
@@ -86,84 +111,97 @@ export class RoomService {
     isMutual: boolean
     connectionId?: string
   }> {
-    const [fromAgent, toAgent] = await Promise.all([
-      prisma.agent.findUniqueOrThrow({ where: { id: fromAgentId } }),
-      prisma.agent.findUniqueOrThrow({ where: { id: toAgentId } }),
+    const [{ data: _fromAgent }, { data: toAgent }] = await Promise.all([
+      supabase.from('agents').select('*').eq('id', fromAgentId).single(),
+      supabase.from('agents').select('*').eq('id', toAgentId).single(),
     ])
 
-    const room = await prisma.room.findUniqueOrThrow({ where: { id: roomId } })
+    const { data: room } = await supabase.from('rooms').select('*').eq('id', roomId).single()
 
-    // Get active instances for from-agent
+    if (!toAgent || !room) return { alignmentScore: 0, isMutual: false }
+
     const instances = agentService.getActiveInstances(fromAgentId)
-    let alignmentScore = 50 // default
+    let alignmentScore = 50
 
     if (instances[0]) {
       alignmentScore = await agentService.computeResonanceScore(instances[0].instanceId, {
-        niche: room.niche,
-        interests: [room.niche, toAgent.communicationStyle],
-        reputationScore: toAgent.reputationScore,
+        niche:           room.niche,
+        interests:       [room.niche, toAgent.communication_style],
+        reputationScore: toAgent.reputation_score,
       })
     }
 
-    // Check if toAgent has already resonated with fromAgent (mutual)
-    const existingConnection = await prisma.agentConnection.findFirst({
-      where: {
-        OR: [
-          { initiatorId: toAgentId, receiverId: fromAgentId },
-          { initiatorId: fromAgentId, receiverId: toAgentId },
-        ],
-      },
-    })
+    const { data: existingConnection } = await supabase
+      .from('agent_connections')
+      .select('*')
+      .or(`and(initiator_id.eq.${toAgentId},receiver_id.eq.${fromAgentId}),and(initiator_id.eq.${fromAgentId},receiver_id.eq.${toAgentId})`)
+      .maybeSingle()
 
     if (existingConnection && alignmentScore >= 70) {
-      // Upgrade to active connection
-      const connection = await prisma.agentConnection.update({
-        where: { id: existingConnection.id },
-        data: { status: 'ACTIVE', alignmentScore },
-      })
-      return { alignmentScore, isMutual: true, connectionId: connection.id }
+      const { data: connection } = await supabase
+        .from('agent_connections')
+        .update({ status: 'ACTIVE', alignment_score: alignmentScore })
+        .eq('id', existingConnection.id)
+        .select()
+        .single()
+
+      return { alignmentScore, isMutual: true, connectionId: connection?.id }
     }
 
-    // Create pending connection
     if (alignmentScore >= 60) {
-      const connection = await prisma.agentConnection.create({
-        data: {
-          initiatorId: fromAgentId,
-          receiverId: toAgentId,
-          roomId,
-          status: 'PENDING',
-          alignmentScore,
-        },
-      })
-      return { alignmentScore, isMutual: false, connectionId: connection.id }
+      const { data: connection } = await supabase
+        .from('agent_connections')
+        .insert({
+          initiator_id:    fromAgentId,
+          receiver_id:     toAgentId,
+          room_id:         roomId,
+          status:          'PENDING',
+          alignment_score: alignmentScore,
+        })
+        .select()
+        .single()
+
+      return { alignmentScore, isMutual: false, connectionId: connection?.id }
     }
 
     return { alignmentScore, isMutual: false }
   }
 
   async sendAgentChatMessage(connectionId: string, fromAgentId: string, message: string) {
-    const connection = await prisma.agentConnection.findUniqueOrThrow({
-      where: { id: connectionId, status: 'ACTIVE' },
-    })
+    const { data: connection, error: connError } = await supabase
+      .from('agent_connections')
+      .select('*')
+      .eq('id', connectionId)
+      .eq('status', 'ACTIVE')
+      .single()
 
-    const lastMsg = await prisma.connectionChat.findFirst({
-      where: { connectionId },
-      orderBy: { turnNumber: 'desc' },
-    })
-    const turnNumber = (lastMsg?.turnNumber ?? 0) + 1
+    if (connError || !connection) throw new Error('Active connection not found')
 
-    const chatEntry = await prisma.connectionChat.create({
-      data: { connectionId, fromAgentId, message, turnNumber },
-    })
+    const { data: lastMsg } = await supabase
+      .from('connection_chats')
+      .select('turn_number')
+      .eq('connection_id', connectionId)
+      .order('turn_number', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-    // Queue agent-side response from the other agent
-    const responderId = fromAgentId === connection.initiatorId
-      ? connection.receiverId
-      : connection.initiatorId
+    const turnNumber = (lastMsg?.turn_number ?? 0) + 1
+
+    const { data: chatEntry, error } = await supabase
+      .from('connection_chats')
+      .insert({ connection_id: connectionId, from_agent_id: fromAgentId, message, turn_number: turnNumber })
+      .select()
+      .single()
+
+    if (error) throw new Error(error.message)
+
+    const responderId = fromAgentId === connection.initiator_id
+      ? connection.receiver_id
+      : connection.initiator_id
 
     await roomQueue.add('run_agent_chat_turn', {
-      type: 'run_agent_chat_turn',
-      roomId: connection.roomId ?? '',
+      type:    'run_agent_chat_turn',
+      roomId:  connection.room_id ?? '',
       agentId: responderId,
       payload: { connectionId, inboundMessage: message, turnNumber },
     })
@@ -172,28 +210,38 @@ export class RoomService {
   }
 
   async getChatHistory(connectionId: string) {
-    return prisma.connectionChat.findMany({
-      where: { connectionId },
-      orderBy: { turnNumber: 'asc' },
-    })
+    const { data, error } = await supabase
+      .from('connection_chats')
+      .select('*')
+      .eq('connection_id', connectionId)
+      .order('turn_number')
+
+    if (error) throw new Error(error.message)
+    return data
   }
 
   async getConnectionsForUser(userId: string) {
-    const agents = await prisma.agent.findMany({ where: { userId }, select: { id: true } })
-    const agentIds = agents.map(a => a.id)
+    const { data: agents } = await supabase
+      .from('agents')
+      .select('id')
+      .eq('user_id', userId)
 
-    return prisma.agentConnection.findMany({
-      where: {
-        OR: [{ initiatorId: { in: agentIds } }, { receiverId: { in: agentIds } }],
-        status: 'ACTIVE',
-      },
-      include: {
-        initiator: { select: { name: true, reputationScore: true } },
-        receiver: { select: { name: true, reputationScore: true } },
-        _count: { select: { chatMessages: true } },
-      },
-      orderBy: { updatedAt: 'desc' },
-    })
+    const agentIds = (agents ?? []).map((a: { id: string }) => a.id)
+
+    const { data, error } = await supabase
+      .from('agent_connections')
+      .select(`
+        *,
+        initiator:agents!initiator_id(name, reputation_score),
+        receiver:agents!receiver_id(name, reputation_score),
+        connection_chats(count)
+      `)
+      .in('initiator_id', agentIds)
+      .eq('status', 'ACTIVE')
+      .order('updated_at', { ascending: false })
+
+    if (error) throw new Error(error.message)
+    return data
   }
 }
 

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { getIdentityClient, getTokenClient, isOnchainConfigured } from '../services/onchain.js'
+import { getIdentityClient, isOnchainConfigured } from '../services/onchain.js'
 import { keccak256, toHex } from 'viem'
 
 const MintIdentitySchema = z.object({
@@ -15,11 +15,11 @@ export async function identityRoutes(server: FastifyInstance) {
   // POST /identity/mint — mint soulbound identity NFT on Monad
   server.post('/mint', {
     preHandler: [server.authenticate],
-  }, async (request, reply) => {
+  }, async (request, _reply) => {
     const body = MintIdentitySchema.parse(request.body)
 
     if (!isOnchainConfigured()) {
-      return reply.status(202).send({
+      return _reply.status(202).send({
         message: 'Onchain not configured — contracts not yet deployed. Run pnpm contracts:deploy:testnet.',
         walletAddress: body.walletAddress,
         txHash: null,
@@ -39,7 +39,7 @@ export async function identityRoutes(server: FastifyInstance) {
         permissionsHash,
       })
 
-      return reply.status(202).send({
+      return _reply.status(202).send({
         message: 'Identity minted on Monad',
         walletAddress: body.walletAddress,
         txHash,
@@ -47,12 +47,12 @@ export async function identityRoutes(server: FastifyInstance) {
       })
     } catch (err: any) {
       server.log.error({ err }, 'Identity mint failed')
-      return reply.status(500).send({ error: 'Mint failed', message: err.message })
+      return _reply.status(500).send({ error: 'Mint failed', message: err.message })
     }
   })
 
   // GET /identity/:walletAddress — resolve onchain identity
-  server.get('/:walletAddress', async (request, reply) => {
+  server.get('/:walletAddress', async (request) => {
     const { walletAddress } = request.params as { walletAddress: string }
 
     if (!isOnchainConfigured()) {
@@ -87,28 +87,15 @@ export async function identityRoutes(server: FastifyInstance) {
   })
 
   // GET /identity/:walletAddress/access — get subscription tier from staked $AURA
+  // TODO: session 4 — wire up TokenClient.getAccessTier and getStakingInfo once deployed
   server.get('/:walletAddress/access', async (request) => {
     const { walletAddress } = request.params as { walletAddress: string }
-
-    if (!isOnchainConfigured()) {
-      return { walletAddress, tier: 'free', onchain: false }
-    }
-
-    try {
-      const client = getTokenClient()
-      const [tier, stakingInfo] = await Promise.all([
-        client.getAccessTier(walletAddress as `0x${string}`),
-        client.getStakingInfo(walletAddress as `0x${string}`),
-      ])
-      return { walletAddress, tier, stakingInfo, onchain: true }
-    } catch (err: any) {
-      return { walletAddress, tier: 'free', onchain: false, error: err.message }
-    }
+    return { walletAddress, tier: 'free', onchain: false }
   })
 
   // POST /identity/verify — verify agent handshake signature
   server.post('/verify', async (request) => {
-    const { signature, message, walletAddress } = request.body as any
+    const { walletAddress } = request.body as { signature?: string; message?: string; walletAddress: string }
     // TODO: session 4 — ACP handshake verification
     return { verified: false, walletAddress }
   })

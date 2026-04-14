@@ -1,4 +1,4 @@
-import { prisma } from '../plugins/prisma.js'
+import { supabase } from '../plugins/supabase.js'
 import { agentService } from '@aura/agent-core'
 import { MeetingClient } from '@aura/agent-identity'
 import { Queue } from 'bullmq'
@@ -6,7 +6,12 @@ import { createHash } from 'crypto'
 import pino from 'pino'
 
 const logger = pino({ level: process.env.LOG_LEVEL ?? 'info' })
-const meetingQueue = new Queue('meeting-tasks', { connection: { host: process.env.REDIS_HOST ?? 'localhost', port: Number(process.env.REDIS_PORT ?? 6379) } })
+const meetingQueue = new Queue('meeting-tasks', {
+  connection: {
+    host: process.env.REDIS_HOST ?? 'localhost',
+    port: Number(process.env.REDIS_PORT ?? 6379),
+  },
+})
 
 export class MeetingService {
   private meetingClient?: MeetingClient
@@ -17,10 +22,10 @@ export class MeetingService {
         process.env.MONAD_RPC_URL,
         process.env.DEPLOYER_PRIVATE_KEY as `0x${string}`,
         {
-          identity: process.env.AURA_IDENTITY_CONTRACT as `0x${string}`,
-          permissions: process.env.AURA_PERMISSIONS_CONTRACT as `0x${string}`,
-          registry: process.env.AURA_REGISTRY_CONTRACT as `0x${string}`,
-          reputation: process.env.AURA_REPUTATION_CONTRACT as `0x${string}`,
+          identity:       process.env.AURA_IDENTITY_CONTRACT as `0x${string}`,
+          permissions:    process.env.AURA_PERMISSIONS_CONTRACT as `0x${string}`,
+          registry:       process.env.AURA_REGISTRY_CONTRACT as `0x${string}`,
+          reputation:     process.env.AURA_REPUTATION_CONTRACT as `0x${string}`,
           meetingFactory: process.env.AURA_MEETING_FACTORY_CONTRACT as `0x${string}`,
         }
       )
@@ -35,34 +40,43 @@ export class MeetingService {
     invitees: Array<{ auraId: string; role: string }>
     rules: { agentsCanMakeBindingCommitments: boolean; recordOnchain: boolean }
   }) {
-    const meeting = await prisma.meeting.create({
-      data: {
-        title: data.title,
-        agenda: data.agenda,
-        mode: data.mode,
-        scheduledAt: new Date(data.scheduledAt),
-        status: 'SCHEDULED',
-      },
-    })
+    const { data: meeting, error } = await supabase
+      .from('meetings')
+      .insert({
+        title:        data.title,
+        agenda:       data.agenda,
+        mode:         data.mode,
+        scheduled_at: data.scheduledAt,
+        status:       'SCHEDULED',
+      })
+      .select()
+      .single()
 
-    // Add participants
-    const agents = await prisma.agent.findMany({
-      where: { userId: creatorUserId },
-      take: 1,
-    })
+    if (error) throw new Error(error.message)
 
-    if (agents[0]) {
-      await prisma.meetingParticipant.create({
-        data: { meetingId: meeting.id, agentId: agents[0].id, role: 'participant' },
+    const { data: agents } = await supabase
+      .from('agents')
+      .select('id, wallet_address')
+      .eq('user_id', creatorUserId)
+      .limit(1)
+
+    if (agents?.[0]) {
+      await supabase.from('meeting_participants').insert({
+        meeting_id: meeting.id,
+        agent_id:   agents[0].id,
+        role:       'participant',
       })
     }
 
-    // Queue onchain room deployment if enabled
     if (data.rules.recordOnchain) {
       await meetingQueue.add('start_meeting', {
-        type: 'deploy_room',
+        type:      'deploy_room',
         meetingId: meeting.id,
-        payload: { participants: agents.map(a => a.walletAddress).filter(Boolean) },
+        payload:   {
+          participants: agents
+            ?.map((a: { wallet_address: string | null }) => a.wallet_address)
+            .filter(Boolean) ?? [],
+        },
       })
     }
 
@@ -71,19 +85,21 @@ export class MeetingService {
   }
 
   async startMeeting(meetingId: string) {
-    const meeting = await prisma.meeting.update({
-      where: { id: meetingId },
-      data: { status: 'ACTIVE', startedAt: new Date() },
-      include: { participants: { include: { agent: true } } },
-    })
+    const { data: meeting, error } = await supabase
+      .from('meetings')
+      .update({ status: 'ACTIVE', started_at: new Date().toISOString() })
+      .eq('id', meetingId)
+      .select('*, meeting_participants(agent_id, agents(*))')
+      .single()
 
-    // Spawn agent instances for each participant
-    for (const p of meeting.participants) {
+    if (error) throw new Error(error.message)
+
+    for (const p of (meeting.meeting_participants ?? [])) {
       await meetingQueue.add('process_turn', {
-        type: 'join_meeting',
+        type:      'join_meeting',
         meetingId,
-        agentId: p.agentId,
-        payload: { agenda: meeting.agenda },
+        agentId:   p.agent_id,
+        payload:   { agenda: meeting.agenda },
       })
     }
 
@@ -91,54 +107,75 @@ export class MeetingService {
   }
 
   async addTranscriptEntry(meetingId: string, agentId: string, message: string, turnNumber: number) {
-    return prisma.transcriptEntry.create({
-      data: { meetingId, agentId, message, turnNumber },
-    })
+    const { data, error } = await supabase
+      .from('transcript_entries')
+      .insert({ meeting_id: meetingId, agent_id: agentId, message, turn_number: turnNumber })
+      .select()
+      .single()
+
+    if (error) throw new Error(error.message)
+    return data
   }
 
   async logCommitment(meetingId: string, agentId: string, commitment: string, commitmentType: string) {
-    const entry = await prisma.meetingCommitment.create({
-      data: { meetingId, agentId, commitment, commitmentType },
-    })
+    const { data, error } = await supabase
+      .from('meeting_commitments')
+      .insert({
+        meeting_id:      meetingId,
+        agent_id:        agentId,
+        commitment,
+        commitment_type: commitmentType,
+      })
+      .select()
+      .single()
 
+    if (error) throw new Error(error.message)
     logger.info({ meetingId, agentId, commitment }, 'Commitment logged')
-    return entry
+    return data
   }
 
   async settleMeeting(meetingId: string) {
-    const meeting = await prisma.meeting.findUniqueOrThrow({
-      where: { id: meetingId },
-      include: {
-        participants: { include: { agent: true } },
-        transcriptEntries: { orderBy: { turnNumber: 'asc' } },
-        commitments: true,
-      },
-    })
+    const { data: meeting, error } = await supabase
+      .from('meetings')
+      .select(`
+        *,
+        meeting_participants(agent_id, agents(wallet_address)),
+        transcript_entries(agent_id, message, timestamp, turn_number),
+        meeting_commitments(commitment)
+      `)
+      .eq('id', meetingId)
+      .single()
 
-    // Generate outcome hash
-    const outcomeData = {
-      meetingId,
-      transcript: meeting.transcriptEntries.map(t => ({ agentId: t.agentId, message: t.message, timestamp: t.timestamp })),
-      commitments: meeting.commitments.map(c => c.commitment),
-      settledAt: new Date().toISOString(),
-    }
-    const outcomeHash = `0x${createHash('sha256').update(JSON.stringify(outcomeData)).digest('hex')}`
+    if (error) throw new Error(error.message)
 
-    // Write to Monad if client available
+    const transcript = (meeting.transcript_entries ?? [])
+      .sort((a: { turn_number: number }, b: { turn_number: number }) => a.turn_number - b.turn_number)
+      .map((t: { agent_id: string; message: string; timestamp: string }) => ({
+        agentId:   t.agent_id,
+        message:   t.message,
+        timestamp: t.timestamp,
+      }))
+
+    const commitments = (meeting.meeting_commitments ?? [])
+      .map((c: { commitment: string }) => c.commitment)
+
+    const outcomeData   = { meetingId, transcript, commitments, settledAt: new Date().toISOString() }
+    const outcomeHash   = `0x${createHash('sha256').update(JSON.stringify(outcomeData)).digest('hex')}`
+
     let txHash: string | null = null
-    if (this.meetingClient && meeting.participants.length > 0) {
+    if (this.meetingClient && meeting.meeting_participants?.length > 0) {
       try {
-        const wallets = meeting.participants
-          .map(p => p.agent.walletAddress)
+        const wallets = (meeting.meeting_participants ?? [])
+          .map((p: { agents: { wallet_address: string | null } }) => p.agents?.wallet_address)
           .filter(Boolean) as `0x${string}`[]
 
         if (wallets.length >= 2) {
           txHash = await this.meetingClient.settleMeeting({
             meetingId,
-            transcript: outcomeData.transcript,
-            commitments: outcomeData.commitments,
+            transcript,
+            commitments,
             participants: wallets,
-            scores: wallets.map(() => 85), // default score — refined in session 5
+            scores:       wallets.map(() => 85),
           })
         }
       } catch (err) {
@@ -146,39 +183,41 @@ export class MeetingService {
       }
     }
 
-    // Generate AI summary
-    const instances = agentService.getActiveInstances(meeting.participants[0]?.agentId ?? '')
+    const instances = agentService.getActiveInstances(meeting.meeting_participants?.[0]?.agent_id ?? '')
     let summary: string | null = null
     if (instances[0]) {
       try {
-        summary = await agentService.summariseMeeting(
-          instances[0].instanceId,
-          outcomeData.transcript,
-          outcomeData.commitments
-        )
+        summary = await agentService.summariseMeeting(instances[0].instanceId, transcript, commitments)
       } catch { /* non-critical */ }
     }
 
-    const updated = await prisma.meeting.update({
-      where: { id: meetingId },
-      data: {
-        status: 'SETTLED',
-        endedAt: new Date(),
-        settlementTxHash: txHash,
-        outcomeHash,
+    const { data: updated, error: updateError } = await supabase
+      .from('meetings')
+      .update({
+        status:             'SETTLED',
+        ended_at:           new Date().toISOString(),
+        settlement_tx_hash: txHash,
+        outcome_hash:       outcomeHash,
         summary,
-      },
-    })
+      })
+      .eq('id', meetingId)
+      .select()
+      .single()
 
+    if (updateError) throw new Error(updateError.message)
     logger.info({ meetingId, txHash }, 'Meeting settled')
     return updated
   }
 
   async getTranscript(meetingId: string) {
-    return prisma.transcriptEntry.findMany({
-      where: { meetingId },
-      orderBy: { turnNumber: 'asc' },
-    })
+    const { data, error } = await supabase
+      .from('transcript_entries')
+      .select('*')
+      .eq('meeting_id', meetingId)
+      .order('turn_number')
+
+    if (error) throw new Error(error.message)
+    return data
   }
 }
 

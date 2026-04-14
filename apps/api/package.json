@@ -11,30 +11,30 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@aura/acp": "workspace:*",
     "@aura/agent-core": "workspace:*",
     "@aura/agent-identity": "workspace:*",
-    "@aura/acp": "workspace:*",
     "@aura/db": "workspace:*",
-    "fastify": "^4.28.0",
     "@fastify/cors": "^9.0.0",
     "@fastify/jwt": "^8.0.0",
-    "@fastify/websocket": "^10.0.0",
     "@fastify/rate-limit": "^9.1.0",
-    "socket.io": "^4.7.0",
-    "zod": "^3.23.0",
-    "viem": "^2.17.0",
-    "pino": "^9.3.0",
-    "stripe": "^16.0.0",
+    "@fastify/websocket": "^10.0.0",
+    "@supabase/supabase-js": "^2.103.0",
     "bullmq": "^5.12.0",
-    "ioredis": "^5.4.0",
+    "fastify": "^4.28.0",
     "fastify-plugin": "^4.5.0",
+    "ioredis": "^5.4.0",
+    "pino": "^9.3.0",
     "pino-pretty": "^11.0.0",
-    "@prisma/client": "^5.17.0"
+    "socket.io": "^4.7.0",
+    "stripe": "^16.0.0",
+    "viem": "^2.17.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@aura/config": "workspace:*",
     "@types/node": "^20.0.0",
-    "typescript": "^5.5.0",
-    "tsx": "^4.16.0"
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
   }
 }
