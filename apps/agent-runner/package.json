@@ -13,7 +13,6 @@
   "dependencies": {
     "@aura/agent-core": "workspace:*",
     "@aura/acp": "workspace:*",
-    "@aura/db": "workspace:*",
     "bullmq": "^5.12.0",
     "ioredis": "^5.4.0",
     "socket.io-client": "^4.7.0",

@@ -14,7 +14,6 @@
     "@aura/acp": "workspace:*",
     "@aura/agent-core": "workspace:*",
     "@aura/agent-identity": "workspace:*",
-    "@aura/db": "workspace:*",
     "@fastify/cors": "^9.0.0",
     "@fastify/jwt": "^8.0.0",
     "@fastify/rate-limit": "^9.1.0",
