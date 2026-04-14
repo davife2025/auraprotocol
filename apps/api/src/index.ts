@@ -10,7 +10,7 @@ import { roomRoutes } from './routes/rooms.js'
 import { identityRoutes } from './routes/identity.js'
 import { authRoutes } from './routes/auth.js'
 import { healthRoutes } from './routes/health.js'
-import { prismaPlugin } from './plugins/prisma.js'
+import { supabasePlugin } from './plugins/supabase.js'
 import { authPlugin } from './middleware/auth.js'
 import { roomService } from './services/roomService.js'
 
@@ -26,7 +26,7 @@ async function bootstrap() {
   await server.register(jwt, { secret: process.env.JWT_SECRET ?? 'dev-secret-change-in-production' })
   await server.register(websocket)
   await server.register(rateLimit, { max: 200, timeWindow: '1 minute' })
-  await server.register(prismaPlugin)
+  await server.register(supabasePlugin)
   await server.register(fp(authPlugin))
 
   await server.register(healthRoutes)
