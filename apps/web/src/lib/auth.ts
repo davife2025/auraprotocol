@@ -1,8 +1,12 @@
 import type { NextAuthOptions } from 'next-auth'
-import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { prisma } from './prisma'
+import { createClient } from '@supabase/supabase-js'
 import { Keypair, StrKey } from '@stellar/stellar-sdk'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export function verifyStellarSignature(params: {
   publicKey: string
@@ -21,7 +25,6 @@ export function verifyStellarSignature(params: {
 }
 
 export const authOptions: NextAuthOptions = {
-  adapter:  PrismaAdapter(prisma),
   session:  { strategy: 'jwt' },
   pages:    { signIn: '/login', error: '/login' },
   providers: [
@@ -39,13 +42,18 @@ export const authOptions: NextAuthOptions = {
         const isValid = isDev || verifyStellarSignature(credentials as any)
         if (!isValid) return null
 
-        const user = await prisma.user.upsert({
-          where:  { walletAddress: credentials.publicKey },
-          update: { lastLoginAt: new Date() },
-          create: { walletAddress: credentials.publicKey, lastLoginAt: new Date() },
-        })
+        const { data: user, error } = await supabase
+          .from('users')
+          .upsert(
+            { wallet_address: credentials.publicKey, last_login_at: new Date().toISOString() },
+            { onConflict: 'wallet_address' }
+          )
+          .select()
+          .single()
 
-        return { id: user.id, walletAddress: user.walletAddress }
+        if (error || !user) return null
+
+        return { id: user.id, walletAddress: user.wallet_address }
       },
     }),
   ],

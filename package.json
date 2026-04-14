@@ -2,6 +2,7 @@
   "name": "aura-protocol",
   "version": "0.0.1",
   "private": true,
+  "packageManager": "pnpm@10.22.0",
   "description": "Aura Protocol — sovereign AI agent platform on stellar",
   "engines": {
     "node": ">=20.0.0",
@@ -32,10 +33,14 @@
   "dependencies": {
     "@stellar/stellar-sdk": "^12.3.0"
   },
-  "pnpm": {
+ "pnpm": {
   "overrides": {
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.1"
-  }
+  },
+  "ignoredBuiltDependencies": [
+    "bufferutil",
+    "utf-8-validate"
+  ]
 }
 }
