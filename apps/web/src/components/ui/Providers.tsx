@@ -19,7 +19,9 @@ const StellarWalletContext = createContext<StellarWalletState>({
   connect: async () => {}, disconnect: () => {},
 })
 
-export function useStellarWallet() { return useContext(StellarWalletContext) }
+export function useStellarWallet() {
+  return useContext(StellarWalletContext)
+}
 
 function StellarWalletProvider({ children }: { children: ReactNode }) {
   const [publicKey,   setPublicKey]   = useState<string | null>(null)
@@ -36,8 +38,13 @@ function StellarWalletProvider({ children }: { children: ReactNode }) {
     setConnecting(true)
     try {
       const key = await connectFreighter()
-      if (key) { setPublicKey(key); localStorage.setItem('stellar_public_key', key) }
-    } finally { setConnecting(false) }
+      if (key) {
+        setPublicKey(key)
+        localStorage.setItem('stellar_public_key', key)
+      }
+    } finally {
+      setConnecting(false)
+    }
   }
 
   const disconnect = () => {
@@ -47,7 +54,9 @@ function StellarWalletProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <StellarWalletContext.Provider value={{ publicKey, isConnected: !!publicKey, isInstalled, connecting, connect, disconnect }}>
+    <StellarWalletContext.Provider
+      value={{ publicKey, isConnected: !!publicKey, isInstalled, connecting, connect, disconnect }}
+    >
       {children}
     </StellarWalletContext.Provider>
   )

@@ -5,8 +5,6 @@
 @layer base {
   :root {
     --radius: 0.75rem;
-
-    /* Aura brand palette as CSS vars for use outside Tailwind */
     --aura-50:  #F5F3FF;
     --aura-100: #EDE9FE;
     --aura-200: #DDD6FE;
@@ -31,85 +29,82 @@
     @apply bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-50 antialiased;
   }
 
-  /* Focus visible ring */
   *:focus-visible {
     @apply outline-none ring-2 ring-aura-400 ring-offset-2 ring-offset-white dark:ring-offset-gray-950;
   }
 }
 
 @layer components {
-  /* Cards */
+  /* ── Cards ── */
   .aura-card {
     @apply bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5;
   }
-
   .aura-card-hover {
-    @apply aura-card hover:border-aura-200 dark:hover:border-aura-700 transition-colors duration-200;
+    @apply aura-card hover:border-aura-200 dark:hover:border-aura-800 transition-colors duration-200;
   }
 
-  /* Badges */
+  /* ── Badges ── */
   .aura-badge {
     @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
-
   .aura-badge-active {
     @apply aura-badge bg-teal-50 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300;
   }
-
   .aura-badge-pending {
     @apply aura-badge bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300;
   }
-
   .aura-badge-purple {
     @apply aura-badge bg-aura-50 text-aura-800 dark:bg-aura-900/30 dark:text-aura-300;
   }
+  .aura-badge-gray {
+    @apply aura-badge bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400;
+  }
 
-  /* Buttons */
+  /* ── Buttons ── */
   .aura-btn {
     @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed;
   }
-
   .aura-btn-primary {
     @apply aura-btn bg-aura-600 text-white hover:bg-aura-700 active:scale-[0.98] shadow-sm shadow-aura-600/20;
   }
-
   .aura-btn-ghost {
     @apply aura-btn border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800;
   }
+  .aura-btn-danger {
+    @apply aura-btn border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20;
+  }
 
-  /* Inputs */
+  /* ── Inputs ── */
   .aura-input {
     @apply w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-aura-400 focus:border-transparent transition-shadow;
   }
 
-  /* Nav link */
+  /* ── Navigation ── */
   .aura-nav-link {
     @apply text-xs text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition-colors;
   }
 
-  /* Stat card */
+  /* ── Stat card ── */
   .aura-stat {
     @apply bg-gray-50 dark:bg-gray-800/60 rounded-xl p-4;
   }
 
-  /* Skeleton loader */
+  /* ── Skeleton ── */
   .aura-skeleton {
     @apply bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse;
   }
 
-  /* Glow effect for logo/primary elements */
-  .aura-glow {
-    @apply shadow-lg shadow-aura-600/25;
+  /* ── Spinner ── */
+  .aura-spinner {
+    @apply w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin;
   }
 }
 
 @layer utilities {
-  /* Gradient text */
   .text-aura-gradient {
     @apply bg-gradient-to-r from-aura-600 to-aura-400 bg-clip-text text-transparent;
   }
 
-  /* Scrollbar hide */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -118,7 +113,6 @@
     display: none;
   }
 
-  /* Line clamp fallback */
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;

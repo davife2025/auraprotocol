@@ -3,18 +3,24 @@ import { Inter } from 'next/font/google'
 import { Providers } from '@/components/ui/Providers'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
   title: 'Aura Protocol — Your AI Agent',
-  description: 'Sovereign AI agents representing you in meetings, networking, and commerce on Monad.',
+  description:
+    'Sovereign AI agents representing you in meetings, networking, and commerce on Stellar.',
   icons: { icon: '/favicon.ico' },
+  openGraph: {
+    title: 'Aura Protocol',
+    description: 'Your presence, everywhere.',
+    type: 'website',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={`${inter.variable} font-sans`}>
         <Providers>{children}</Providers>
       </body>
     </html>
