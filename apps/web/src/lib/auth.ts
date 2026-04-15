@@ -3,11 +3,6 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { createClient } from '@supabase/supabase-js'
 import { Keypair, StrKey } from '@stellar/stellar-sdk'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 export function verifyStellarSignature(params: {
   publicKey: string
   message:   string
@@ -41,6 +36,11 @@ export const authOptions: NextAuthOptions = {
         const isDev   = process.env.NODE_ENV === 'development' && credentials.message === 'dev'
         const isValid = isDev || verifyStellarSignature(credentials as any)
         if (!isValid) return null
+
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
 
         const { data: user, error } = await supabase
           .from('users')
