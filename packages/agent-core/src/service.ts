@@ -1,13 +1,13 @@
 import OpenAI from 'openai'
-import { VectorMemoryManager } from '../src/memory/vectorManager'
-import { PermissionEnforcer } from '../src/permissions/enforcer'
+import { VectorMemoryManager } from './memory/vectorManager.js'
+import { PermissionEnforcer } from './permissions/enforcer.js'
 import type {
   AgentProfile,
   AgentDecisionContext,
   AgentDecision,
   AgentInstance,
   AgentStatus,
-} from '../src/types'
+} from './types/index.js'
 
 const client = new OpenAI({
   baseURL: 'https://router.huggingface.co/novita/v3/openai',
