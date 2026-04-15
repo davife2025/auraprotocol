@@ -5,7 +5,8 @@
       "@/*": ["./src/*"]
     },
     "noEmit": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "types": ["node"]
   },
   "include": [
     "next-env.d.ts",

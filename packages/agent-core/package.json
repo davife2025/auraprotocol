@@ -27,6 +27,7 @@
     "@aura/config": "workspace:*",
     "@types/minimatch": "^6.0.0",
     "@types/node": "^20.0.0",
+    "minimatch": "^10.2.5",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"
   }
