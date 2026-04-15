@@ -1,8 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm --filter @aura/web build",
-  "outputDirectory": "apps/web/.next",
-  "installCommand": "pnpm install",
+  "buildCommand": "cd ../.. && pnpm --filter @aura/web build",
+  "installCommand": "cd ../.. && pnpm install",
   "framework": "nextjs",
   "rewrites": [
     {
