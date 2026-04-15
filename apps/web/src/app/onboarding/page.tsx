@@ -3,9 +3,20 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useStellarWallet } from '@/components/ui/Providers'
-import { truncateStellarAddress } from '@/lib/stellar'
+import {
+  truncateStellarAddress,
+  isValidStellarAddress,
+  type WalletType,
+} from '@/lib/stellar'
 
 const STEPS = ['Connect wallet', 'Name your agent', 'Set personality', 'Set permissions', 'Mint identity']
+
+const WALLETS: { type: WalletType; label: string; icon: string; description: string }[] = [
+  { type: 'freighter', label: 'Freighter', icon: '🚀', description: 'Official Stellar browser extension' },
+  { type: 'xbull',    label: 'xBull',     icon: '🐂', description: 'Feature-rich Stellar wallet' },
+  { type: 'lobstr',   label: 'LOBSTR',    icon: '🦞', description: 'Mobile-friendly Stellar wallet' },
+  { type: 'manual',   label: 'Public Key',icon: '🔑', description: 'Enter your Stellar public key manually' },
+]
 
 const DEFAULT_FORM = {
   name: '',
@@ -13,17 +24,20 @@ const DEFAULT_FORM = {
   riskTolerance: 'moderate',
   timezone: typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC',
   customInstructions: '',
-  canCommitTo:     ['schedule follow-ups', 'agree to meetings', 'share information'],
-  cannotCommitTo:  ['financial agreements', 'legal contracts', 'NDA'],
-  escalateIf:      ['equity', 'investment', 'legal', 'payment'],
+  canCommitTo:    ['schedule follow-ups', 'agree to meetings', 'share information'],
+  cannotCommitTo: ['financial agreements', 'legal contracts', 'NDA'],
+  escalateIf:     ['equity', 'investment', 'legal', 'payment'],
 }
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const { publicKey, isConnected, isInstalled, connecting, connect } = useStellarWallet()
-  const [step, setStep]     = useState(0)
-  const [loading, setLoading] = useState(false)
-  const [form, setForm]     = useState(DEFAULT_FORM)
+  const { publicKey, isConnected, connecting, connect, disconnect } = useStellarWallet()
+  const [step, setStep]         = useState(0)
+  const [loading, setLoading]   = useState(false)
+  const [form, setForm]         = useState(DEFAULT_FORM)
+  const [manualKey, setManualKey]     = useState('')
+  const [showManual, setShowManual]   = useState(false)
+  const [walletError, setWalletError] = useState<string | null>(null)
 
   const next = () => setStep(s => Math.min(s + 1, STEPS.length - 1))
   const back = () => setStep(s => Math.max(s - 1, 0))
@@ -34,6 +48,23 @@ export default function OnboardingPage() {
 
   const removeTag = (key: string, i: number) =>
     setForm(f => ({ ...f, [key]: (f[key as keyof typeof f] as string[]).filter((_, j) => j !== i) }))
+
+  const handleConnect = async (type: WalletType) => {
+    setWalletError(null)
+    if (type === 'manual') { setShowManual(true); return }
+    if (type === 'lobstr') { window.open('https://lobstr.co/', '_blank'); setShowManual(true); return }
+    await connect(type)
+  }
+
+  const handleManualSubmit = async () => {
+    if (!isValidStellarAddress(manualKey.trim())) {
+      setWalletError('Invalid Stellar public key. It should start with G and be 56 characters.')
+      return
+    }
+    await connect('manual', manualKey.trim())
+    setShowManual(false)
+    setManualKey('')
+  }
 
   const createAgent = async () => {
     if (!publicKey) return
@@ -60,9 +91,9 @@ export default function OnboardingPage() {
           },
           permissions: {
             meetings: {
-              canCommitTo:     form.canCommitTo,
-              cannotCommitTo:  form.cannotCommitTo,
-              escalateIf:      form.escalateIf,
+              canCommitTo:    form.canCommitTo,
+              cannotCommitTo: form.cannotCommitTo,
+              escalateIf:     form.escalateIf,
               maxMeetingDurationMins: 60,
               requireHumanApprovalForBindingCommitments: true,
             },
@@ -94,12 +125,13 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-lg">
+
         {/* Progress stepper */}
-        <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1 scrollbar-hide">
+        <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1">
           {STEPS.map((_s, i) => (
             <div key={i} className="flex items-center gap-2 shrink-0">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors ${
-                i < step  ? 'bg-teal-500 text-white'
+                i < step    ? 'bg-teal-500 text-white'
                 : i === step ? 'bg-aura-600 text-white'
                 : 'bg-gray-200 dark:bg-gray-800 text-gray-400'
               }`}>
@@ -112,8 +144,9 @@ export default function OnboardingPage() {
           ))}
         </div>
 
-        <div className="aura-card !p-8 animate-slide-up">
-          {/* Step 0: Connect */}
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-8">
+
+          {/* ── Step 0: Connect wallet ── */}
           {step === 0 && (
             <div className="space-y-5">
               <div>
@@ -121,42 +154,82 @@ export default function OnboardingPage() {
                 <p className="text-gray-500 text-sm mt-1">Your Stellar wallet is your agent's onchain identity anchor.</p>
               </div>
 
-              {!isInstalled && (
-                <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                  <p className="text-sm text-amber-700 dark:text-amber-300">
-                    Freighter not detected.{' '}
-                    <a href="https://www.freighter.app/" target="_blank" rel="noreferrer" className="underline">
-                      Install it here →
-                    </a>
-                  </p>
-                </div>
-              )}
-
               {isConnected && publicKey ? (
-                <div className="flex items-center gap-3 p-3 bg-teal-50 dark:bg-teal-900/20 rounded-xl border border-teal-200 dark:border-teal-800">
-                  <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-                  <span className="text-sm text-teal-700 dark:text-teal-300 font-mono">
-                    {truncateStellarAddress(publicKey, 8)}
-                  </span>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 p-3.5 rounded-xl bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800">
+                    <div className="w-2 h-2 rounded-full bg-teal-400 shrink-0 animate-pulse" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-teal-600 dark:text-teal-400 mb-0.5">Connected</p>
+                      <p className="text-sm text-teal-800 dark:text-teal-200 font-mono truncate">
+                        {truncateStellarAddress(publicKey, 8)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={disconnect}
+                      className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0 transition-colors"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                  <button onClick={next} className="w-full py-3 rounded-xl bg-aura-600 text-white font-medium hover:bg-aura-800 transition-colors">
+                    Continue
+                  </button>
                 </div>
-              ) : (
-                <button
-                  onClick={connect}
-                  disabled={connecting || !isInstalled}
-                  className="aura-btn-ghost w-full py-3"
-                >
-                  {connecting && <span className="aura-spinner !border-gray-300 !border-t-gray-700" />}
-                  {connecting ? 'Connecting...' : 'Connect Freighter'}
-                </button>
-              )}
 
-              <button onClick={next} disabled={!isConnected} className="aura-btn-primary w-full py-3">
-                Continue
-              </button>
+              ) : showManual ? (
+                <div className="space-y-3">
+                  <p className="text-xs text-gray-500">Enter your Stellar public key (starts with G)</p>
+                  <input
+                    type="text"
+                    value={manualKey}
+                    onChange={e => { setManualKey(e.target.value); setWalletError(null) }}
+                    placeholder="GABC...XYZ"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-mono text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-aura-400"
+                  />
+                  {walletError && <p className="text-xs text-red-500">{walletError}</p>}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setShowManual(false); setWalletError(null) }}
+                      className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handleManualSubmit}
+                      className="flex-1 py-2.5 rounded-xl bg-aura-600 text-white text-sm font-medium hover:bg-aura-800 transition-colors"
+                    >
+                      Connect
+                    </button>
+                  </div>
+                </div>
+
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-400 mb-3">Choose your wallet</p>
+                  {WALLETS.map(w => (
+                    <button
+                      key={w.type}
+                      onClick={() => handleConnect(w.type)}
+                      disabled={connecting}
+                      className="w-full flex items-center gap-3 p-3.5 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all text-left disabled:opacity-50"
+                    >
+                      <span className="text-xl">{w.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{w.label}</p>
+                        <p className="text-xs text-gray-400 truncate">{w.description}</p>
+                      </div>
+                      {connecting
+                        ? <span className="w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin shrink-0" />
+                        : <span className="text-gray-400 text-xs shrink-0">→</span>
+                      }
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
-          {/* Step 1: Name */}
+          {/* ── Step 1: Name ── */}
           {step === 1 && (
             <div className="space-y-5">
               <div>
@@ -164,19 +237,19 @@ export default function OnboardingPage() {
                 <p className="text-gray-500 text-sm mt-1">This is how your agent introduces itself in rooms and meetings.</p>
               </div>
               <input
-                className="aura-input py-3"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-aura-400"
                 placeholder="e.g. Alex's Agent, Ade Protocol"
                 value={form.name}
                 onChange={e => set('name', e.target.value)}
               />
               <div className="flex gap-3 pt-1">
-                <button onClick={back} className="aura-btn-ghost flex-1 py-3">Back</button>
-                <button onClick={next} disabled={!form.name} className="aura-btn-primary flex-1 py-3">Continue</button>
+                <button onClick={back} className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Back</button>
+                <button onClick={next} disabled={!form.name} className="flex-1 py-3 rounded-xl bg-aura-600 text-white font-medium disabled:opacity-40 hover:bg-aura-800 transition-colors">Continue</button>
               </div>
             </div>
           )}
 
-          {/* Step 2: Personality */}
+          {/* ── Step 2: Personality ── */}
           {step === 2 && (
             <div className="space-y-5">
               <div>
@@ -205,20 +278,20 @@ export default function OnboardingPage() {
                 </label>
                 <textarea
                   rows={3}
-                  className="aura-input resize-none"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-aura-400 resize-none"
                   placeholder="e.g. Always push for async over synchronous meetings..."
                   value={form.customInstructions}
                   onChange={e => set('customInstructions', e.target.value)}
                 />
               </div>
               <div className="flex gap-3">
-                <button onClick={back} className="aura-btn-ghost flex-1 py-3">Back</button>
-                <button onClick={next} className="aura-btn-primary flex-1 py-3">Continue</button>
+                <button onClick={back} className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Back</button>
+                <button onClick={next} className="flex-1 py-3 rounded-xl bg-aura-600 text-white font-medium hover:bg-aura-800 transition-colors">Continue</button>
               </div>
             </div>
           )}
 
-          {/* Step 3: Permissions */}
+          {/* ── Step 3: Permissions ── */}
           {step === 3 && (
             <div className="space-y-5">
               <div>
@@ -250,7 +323,7 @@ export default function OnboardingPage() {
                       ))}
                     </div>
                     <input
-                      className="aura-input text-xs py-1.5"
+                      className="w-full px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-aura-400"
                       placeholder="Type and press Enter to add..."
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
@@ -263,13 +336,13 @@ export default function OnboardingPage() {
                 ))}
               </div>
               <div className="flex gap-3">
-                <button onClick={back} className="aura-btn-ghost flex-1 py-3">Back</button>
-                <button onClick={next} className="aura-btn-primary flex-1 py-3">Continue</button>
+                <button onClick={back} className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Back</button>
+                <button onClick={next} className="flex-1 py-3 rounded-xl bg-aura-600 text-white font-medium hover:bg-aura-800 transition-colors">Continue</button>
               </div>
             </div>
           )}
 
-          {/* Step 4: Mint */}
+          {/* ── Step 4: Mint ── */}
           {step === 4 && (
             <div className="space-y-6 text-center">
               <div className="w-16 h-16 rounded-full bg-aura-100 dark:bg-aura-900/50 flex items-center justify-center mx-auto">
@@ -284,24 +357,37 @@ export default function OnboardingPage() {
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3 text-left">
-                <div className="aura-stat">
+                <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
                   <p className="text-xs text-gray-400 mb-1">Style</p>
                   <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">{form.communicationStyle}</p>
                 </div>
-                <div className="aura-stat">
+                <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
                   <p className="text-xs text-gray-400 mb-1">Risk tolerance</p>
                   <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">{form.riskTolerance}</p>
                 </div>
+                <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800 col-span-2">
+                  <p className="text-xs text-gray-400 mb-1">Wallet</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white font-mono truncate">
+                    {publicKey ? truncateStellarAddress(publicKey, 10) : '—'}
+                  </p>
+                </div>
               </div>
               <div className="flex gap-3">
-                <button onClick={back} className="aura-btn-ghost flex-1 py-3">Back</button>
-                <button onClick={createAgent} disabled={loading} className="aura-btn-primary flex-1 py-3">
-                  {loading && <span className="aura-spinner" />}
+                <button onClick={back} className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  Back
+                </button>
+                <button
+                  onClick={createAgent}
+                  disabled={loading}
+                  className="flex-1 py-3 rounded-xl bg-aura-600 text-white font-medium disabled:opacity-40 hover:bg-aura-800 transition-colors flex items-center justify-center gap-2"
+                >
+                  {loading && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                   {loading ? 'Minting...' : 'Create agent'}
                 </button>
               </div>
             </div>
           )}
+
         </div>
       </div>
     </div>

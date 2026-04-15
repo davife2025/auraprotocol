@@ -1,4 +1,4 @@
-import { hashMessage, recoverMessageAddress } from 'viem'
+import { recoverMessageAddress } from 'viem'
 import type {
   ACPEnvelope,
   ACPSession,
