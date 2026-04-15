@@ -3,19 +3,16 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useStellarWallet } from '@/components/ui/Providers'
-import {
-  truncateStellarAddress,
-  isValidStellarAddress,
-  type WalletType,
-} from '@/lib/stellar'
+import { truncateStellarAddress, isValidStellarAddress, type WalletType } from '@/lib/stellar'
+import { apiPost } from '@/lib/api'
 
 const STEPS = ['Connect wallet', 'Name your agent', 'Set personality', 'Set permissions', 'Mint identity']
 
 const WALLETS: { type: WalletType; label: string; icon: string; description: string }[] = [
-  { type: 'freighter', label: 'Freighter', icon: '🚀', description: 'Official Stellar browser extension' },
-  { type: 'xbull',    label: 'xBull',     icon: '🐂', description: 'Feature-rich Stellar wallet' },
-  { type: 'lobstr',   label: 'LOBSTR',    icon: '🦞', description: 'Mobile-friendly Stellar wallet' },
-  { type: 'manual',   label: 'Public Key',icon: '🔑', description: 'Enter your Stellar public key manually' },
+  { type: 'freighter', label: 'Freighter',  icon: '🚀', description: 'Official Stellar browser extension' },
+  { type: 'xbull',    label: 'xBull',      icon: '🐂', description: 'Feature-rich Stellar wallet' },
+  { type: 'lobstr',   label: 'LOBSTR',     icon: '🦞', description: 'Mobile-friendly Stellar wallet' },
+  { type: 'manual',   label: 'Public Key', icon: '🔑', description: 'Enter your Stellar public key manually' },
 ]
 
 const DEFAULT_FORM = {
@@ -32,12 +29,13 @@ const DEFAULT_FORM = {
 export default function OnboardingPage() {
   const router = useRouter()
   const { publicKey, isConnected, connecting, connect, disconnect } = useStellarWallet()
-  const [step, setStep]         = useState(0)
-  const [loading, setLoading]   = useState(false)
-  const [form, setForm]         = useState(DEFAULT_FORM)
+  const [step, setStep]               = useState(0)
+  const [loading, setLoading]         = useState(false)
+  const [form, setForm]               = useState(DEFAULT_FORM)
   const [manualKey, setManualKey]     = useState('')
   const [showManual, setShowManual]   = useState(false)
   const [walletError, setWalletError] = useState<string | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
 
   const next = () => setStep(s => Math.min(s + 1, STEPS.length - 1))
   const back = () => setStep(s => Math.max(s - 1, 0))
@@ -69,41 +67,43 @@ export default function OnboardingPage() {
   const createAgent = async () => {
     if (!publicKey) return
     setLoading(true)
+    setCreateError(null)
     try {
-      const authRes = await fetch('/api/v1/auth/signin', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ walletAddress: publicKey, signature: 'dev', message: 'dev' }),
+      // 1. Sign in → get JWT
+      const authRes = await apiPost('/api/v1/auth/signin', {
+        walletAddress: publicKey,
+        signature: 'dev',
+        message:   'dev',
       })
+      if (!authRes.ok) throw new Error('Auth failed')
       const { token } = await authRes.json()
       if (token) localStorage.setItem('aura_token', token)
 
-      await fetch('/api/v1/agents', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body:    JSON.stringify({
-          name: form.name,
-          personalityProfile: {
-            communicationStyle: form.communicationStyle,
-            riskTolerance:      form.riskTolerance,
-            timezone:           form.timezone,
-            customInstructions: form.customInstructions,
+      // 2. Create agent
+      const agentRes = await apiPost('/api/v1/agents', {
+        name: form.name,
+        personalityProfile: {
+          communicationStyle: form.communicationStyle,
+          riskTolerance:      form.riskTolerance,
+          timezone:           form.timezone,
+          customInstructions: form.customInstructions,
+        },
+        permissions: {
+          meetings: {
+            canCommitTo:    form.canCommitTo,
+            cannotCommitTo: form.cannotCommitTo,
+            escalateIf:     form.escalateIf,
+            maxMeetingDurationMins: 60,
+            requireHumanApprovalForBindingCommitments: true,
           },
-          permissions: {
-            meetings: {
-              canCommitTo:    form.canCommitTo,
-              cannotCommitTo: form.cannotCommitTo,
-              escalateIf:     form.escalateIf,
-              maxMeetingDurationMins: 60,
-              requireHumanApprovalForBindingCommitments: true,
-            },
-          },
-        }),
-      })
+        },
+      }, token)
 
+      if (!agentRes.ok) throw new Error('Failed to create agent')
       router.push('/dashboard')
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
+      setCreateError(err?.message ?? 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -127,11 +127,11 @@ export default function OnboardingPage() {
       <div className="w-full max-w-lg">
 
         {/* Progress stepper */}
-        <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1">
+        <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1 scrollbar-hide">
           {STEPS.map((_s, i) => (
             <div key={i} className="flex items-center gap-2 shrink-0">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors ${
-                i < step    ? 'bg-teal-500 text-white'
+                i < step     ? 'bg-teal-500 text-white'
                 : i === step ? 'bg-aura-600 text-white'
                 : 'bg-gray-200 dark:bg-gray-800 text-gray-400'
               }`}>
@@ -171,32 +171,32 @@ export default function OnboardingPage() {
                       Disconnect
                     </button>
                   </div>
-                  <button onClick={next} className="w-full py-3 rounded-xl bg-aura-600 text-white font-medium hover:bg-aura-800 transition-colors">
+                  <button onClick={next} className="aura-btn-primary w-full py-3">
                     Continue
                   </button>
                 </div>
 
               ) : showManual ? (
                 <div className="space-y-3">
-                  <p className="text-xs text-gray-500">Enter your Stellar public key (starts with G)</p>
+                  <p className="text-xs text-gray-500">Enter your Stellar public key (starts with G, 56 characters)</p>
                   <input
                     type="text"
                     value={manualKey}
                     onChange={e => { setManualKey(e.target.value); setWalletError(null) }}
                     placeholder="GABC...XYZ"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-mono text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-aura-400"
+                    className="aura-input font-mono"
                   />
                   {walletError && <p className="text-xs text-red-500">{walletError}</p>}
                   <div className="flex gap-2">
                     <button
                       onClick={() => { setShowManual(false); setWalletError(null) }}
-                      className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                      className="aura-btn-ghost flex-1 py-2.5"
                     >
                       Back
                     </button>
                     <button
                       onClick={handleManualSubmit}
-                      className="flex-1 py-2.5 rounded-xl bg-aura-600 text-white text-sm font-medium hover:bg-aura-800 transition-colors"
+                      className="aura-btn-primary flex-1 py-2.5"
                     >
                       Connect
                     </button>
@@ -211,7 +211,7 @@ export default function OnboardingPage() {
                       key={w.type}
                       onClick={() => handleConnect(w.type)}
                       disabled={connecting}
-                      className="w-full flex items-center gap-3 p-3.5 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all text-left disabled:opacity-50"
+                      className="w-full flex items-center gap-3 p-3.5 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-aura-200 dark:hover:border-aura-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all text-left disabled:opacity-50"
                     >
                       <span className="text-xl">{w.icon}</span>
                       <div className="flex-1 min-w-0">
@@ -220,7 +220,7 @@ export default function OnboardingPage() {
                       </div>
                       {connecting
                         ? <span className="w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin shrink-0" />
-                        : <span className="text-gray-400 text-xs shrink-0">→</span>
+                        : <span className="text-gray-300 text-sm shrink-0">→</span>
                       }
                     </button>
                   ))}
@@ -237,14 +237,14 @@ export default function OnboardingPage() {
                 <p className="text-gray-500 text-sm mt-1">This is how your agent introduces itself in rooms and meetings.</p>
               </div>
               <input
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-aura-400"
+                className="aura-input py-3"
                 placeholder="e.g. Alex's Agent, Ade Protocol"
                 value={form.name}
                 onChange={e => set('name', e.target.value)}
               />
               <div className="flex gap-3 pt-1">
-                <button onClick={back} className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Back</button>
-                <button onClick={next} disabled={!form.name} className="flex-1 py-3 rounded-xl bg-aura-600 text-white font-medium disabled:opacity-40 hover:bg-aura-800 transition-colors">Continue</button>
+                <button onClick={back} className="aura-btn-ghost flex-1 py-3">Back</button>
+                <button onClick={next} disabled={!form.name} className="aura-btn-primary flex-1 py-3">Continue</button>
               </div>
             </div>
           )}
@@ -278,15 +278,15 @@ export default function OnboardingPage() {
                 </label>
                 <textarea
                   rows={3}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-aura-400 resize-none"
+                  className="aura-input resize-none"
                   placeholder="e.g. Always push for async over synchronous meetings..."
                   value={form.customInstructions}
                   onChange={e => set('customInstructions', e.target.value)}
                 />
               </div>
               <div className="flex gap-3">
-                <button onClick={back} className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Back</button>
-                <button onClick={next} className="flex-1 py-3 rounded-xl bg-aura-600 text-white font-medium hover:bg-aura-800 transition-colors">Continue</button>
+                <button onClick={back} className="aura-btn-ghost flex-1 py-3">Back</button>
+                <button onClick={next} className="aura-btn-primary flex-1 py-3">Continue</button>
               </div>
             </div>
           )}
@@ -316,14 +316,12 @@ export default function OnboardingPage() {
                           <button
                             className="text-gray-400 hover:text-red-500 transition-colors ml-0.5"
                             onClick={() => removeTag(key, i)}
-                          >
-                            ×
-                          </button>
+                          >×</button>
                         </span>
                       ))}
                     </div>
                     <input
-                      className="w-full px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-aura-400"
+                      className="aura-input text-xs py-1.5"
                       placeholder="Type and press Enter to add..."
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
@@ -336,8 +334,8 @@ export default function OnboardingPage() {
                 ))}
               </div>
               <div className="flex gap-3">
-                <button onClick={back} className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Back</button>
-                <button onClick={next} className="flex-1 py-3 rounded-xl bg-aura-600 text-white font-medium hover:bg-aura-800 transition-colors">Continue</button>
+                <button onClick={back} className="aura-btn-ghost flex-1 py-3">Back</button>
+                <button onClick={next} className="aura-btn-primary flex-1 py-3">Continue</button>
               </div>
             </div>
           )}
@@ -357,31 +355,32 @@ export default function OnboardingPage() {
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3 text-left">
-                <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
+                <div className="aura-stat">
                   <p className="text-xs text-gray-400 mb-1">Style</p>
                   <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">{form.communicationStyle}</p>
                 </div>
-                <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
+                <div className="aura-stat">
                   <p className="text-xs text-gray-400 mb-1">Risk tolerance</p>
                   <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">{form.riskTolerance}</p>
                 </div>
-                <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800 col-span-2">
+                <div className="aura-stat col-span-2">
                   <p className="text-xs text-gray-400 mb-1">Wallet</p>
                   <p className="text-sm font-medium text-gray-900 dark:text-white font-mono truncate">
                     {publicKey ? truncateStellarAddress(publicKey, 10) : '—'}
                   </p>
                 </div>
               </div>
+
+              {createError && (
+                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                  <p className="text-xs text-red-600 dark:text-red-400">{createError}</p>
+                </div>
+              )}
+
               <div className="flex gap-3">
-                <button onClick={back} className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                  Back
-                </button>
-                <button
-                  onClick={createAgent}
-                  disabled={loading}
-                  className="flex-1 py-3 rounded-xl bg-aura-600 text-white font-medium disabled:opacity-40 hover:bg-aura-800 transition-colors flex items-center justify-center gap-2"
-                >
-                  {loading && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                <button onClick={back} className="aura-btn-ghost flex-1 py-3">Back</button>
+                <button onClick={createAgent} disabled={loading} className="aura-btn-primary flex-1 py-3">
+                  {loading && <span className="aura-spinner" />}
                   {loading ? 'Minting...' : 'Create agent'}
                 </button>
               </div>

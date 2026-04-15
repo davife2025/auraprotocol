@@ -1,11 +1,9 @@
 'use client'
+
 import { SessionProvider } from 'next-auth/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState, createContext, useContext, useEffect, type ReactNode } from 'react'
-import {
-  connectFreighter, connectXBull,
-  type WalletType,
-} from '@/lib/stellar'
+import { connectWallet, type WalletType } from '@/lib/stellar'
 
 interface StellarWalletState {
   publicKey:    string | null
@@ -21,7 +19,9 @@ const StellarWalletContext = createContext<StellarWalletState>({
   connect: async () => {}, disconnect: () => {},
 })
 
-export function useStellarWallet() { return useContext(StellarWalletContext) }
+export function useStellarWallet() {
+  return useContext(StellarWalletContext)
+}
 
 function StellarWalletProvider({ children }: { children: ReactNode }) {
   const [publicKey,  setPublicKey]  = useState<string | null>(null)
@@ -29,22 +29,20 @@ function StellarWalletProvider({ children }: { children: ReactNode }) {
   const [connecting, setConnecting] = useState(false)
 
   useEffect(() => {
-    const savedKey  = localStorage.getItem('stellar_public_key')
-    const savedType = localStorage.getItem('stellar_wallet_type') as WalletType | null
-    if (savedKey) { setPublicKey(savedKey); setWalletType(savedType) }
+    const saved     = typeof window !== 'undefined' ? localStorage.getItem('stellar_public_key')  : null
+    const savedType = typeof window !== 'undefined' ? localStorage.getItem('stellar_wallet_type') : null
+    if (saved) setPublicKey(saved)
+    if (savedType) setWalletType(savedType as WalletType)
   }, [])
 
   const connect = async (type: WalletType, manualKey?: string) => {
     setConnecting(true)
     try {
-      let key: string | null = null
-      if (type === 'freighter') key = await connectFreighter()
-      else if (type === 'xbull') key = await connectXBull()
-      else if (type === 'manual' && manualKey) key = manualKey
+      const key = await connectWallet(type, manualKey)
       if (key) {
         setPublicKey(key)
         setWalletType(type)
-        localStorage.setItem('stellar_public_key', key)
+        localStorage.setItem('stellar_public_key',  key)
         localStorage.setItem('stellar_wallet_type', type)
       }
     } finally {
@@ -73,6 +71,7 @@ export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: { queries: { staleTime: 60_000, retry: 1 } },
   }))
+
   return (
     <QueryClientProvider client={queryClient}>
       <StellarWalletProvider>
